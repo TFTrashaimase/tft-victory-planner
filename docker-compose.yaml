@@ -91,7 +91,8 @@ services:
 
   airflow-scheduler:
     <<: *airflow-common
-    command: scheduler
+    command: >
+      chmod +x setup_vim.sh && ./setup_vim.sh
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
       interval: 30s
