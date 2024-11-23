@@ -1,0 +1,25 @@
+# Python 캐시 및 가상 환경 파일
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+*.swp
+
+# 환경 설정 파일
+.env
+*.env
+
+# Git 정보
+.git
+.gitignore
+
+# IDE 관련 파일
+.vscode/
+.idea/
+
+# Docker 관련
+docker-compose.yml
+docker-compose.override.yml
+
+# 자유롭게 추가
