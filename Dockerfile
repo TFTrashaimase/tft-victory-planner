@@ -32,6 +32,9 @@ CMD ["bash", "-c", "/opt/airflow/mysettings/setup_vim.sh && airflow scheduler"]
 # airflow 유저로 복귀
 USER airflow
 
+COPY mysettings/requirements.txt /opt/airflow/mysettings/requirements.txt
+RUN pip install -r mysettings/requirements.txt
+
 # Expose the port for health check if needed
 EXPOSE 8974
 
