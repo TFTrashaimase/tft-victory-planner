@@ -3,6 +3,7 @@ import os
 import logging
 import requests
 import boto3
+import time
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
@@ -24,6 +25,7 @@ QUEUE_TYPE = 'RANKED_TFT'  # 솔로 랭크 큐 타입
 tiers = ["DIAMOND", "EMERALD", "PLATINUM", "GOLD", "SILVER", "BRONZE"]
 divisions = ["I", "II", "III", "IV"]
 page = 1
+MATCHES_COUNT = 20  # 한 번에 가져올 매치 수
 
 if not API_KEY or not BASE_URL:
     raise ValueError("환경 변수 RIOT_API_KEY와 RIOT_API_BASE_URL의 확인이 필요합니다.")
@@ -116,31 +118,99 @@ def get_tier(**kwargs):
                 continue
     return data
 
+# 티어별 puuid를 합친 리스트를 제공
+def process_puuid_data(**kwargs):
+    ti = kwargs['ti']
+    challenger_data = ti.xcom_pull(task_ids='get_challenger_task')
+    grandmaster_data = ti.xcom_pull(task_ids='get_grandmaster_task')
+    master_data = ti.xcom_pull(task_ids='get_master_task')
+    tier_data = ti.xcom_pull(task_ids='get_tier_task')
+
+    raw_puuid_data = list(challenger_data + grandmaster_data + master_data + tier_data)
+
+    return raw_puuid_data
+
+# API를 호출하여 Matching ID 목록을 가져오는 함수
+def get_matching_ids(puuid, **kwargs):
+    url = f"{BASE_URL}/tft/match/v1/matches/by-puuid/{puuid}/ids?start=0&count={MATCHES_COUNT}"
+    request_header = {
+        "X-Riot-Token": API_KEY,
+        "Content-Type": "application/json;charset=utf-8"
+    }
+
+    try:
+        response = requests.get(url, headers=request_header)
+        response.raise_for_status()
+        data = response.json()
+
+        if len(data) > 0:
+            logging.info(f"Fetched {len(data)} matching IDs for puuid: {puuid}")
+            return data
+        else:
+            logging.info(f"No matching IDs found for puuid: {puuid}")
+            return []
+
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Error fetching matching IDs for puuid: {puuid}: {e}")
+        return []
+
+# matching id를 하나의 리스트로 정리
+def process_matching_ids(**kwargs):
+    # TFT_ranker_dag.py의 process_data_task에서 puuid_list를 가져옵니다 (XCom을 사용)
+    puuid_list = kwargs['ti'].xcom_pull(task_ids='process_data_task')  # 'process_data_task' 사용
+    full_matching_ids = []
+
+    if puuid_list:
+        for puuid in puuid_list:
+            # puuid에 대해 matching ID를 가져옵니다
+            time.sleep(1)
+            matching_ids = get_matching_ids(puuid)
+            full_matching_ids += matching_ids
+            logging.info(f"Matching IDs for puuid {puuid}: {matching_ids}")
+    else:
+        logging.error(f"{puuid}: No match data for this puuid found from process_data_task in TFT_ranker_dag.py")
+    
+    return full_matching_ids
+
 # s3에 적재
 def load_json_to_s3(**kwargs):
     exe_datetime = kwargs['execution_date']  # execution_date 기준으로 폴더 명을 나눔
     exe_string = exe_datetime.strftime('%Y-%m-%d')
-    match_data = kwargs['ti'].xcom_pull(task_ids='get_match_info_task')  # 매치데이터를 받아옴
+    match_data = kwargs['ti'].xcom_pull(task_ids='get_matching_ids_task')  # 매치데이터를 받아옴
 
     if not match_data:
         logging.info("No match data to process")
         return exe_string
 
     for match in match_data:
+        time.sleep(1)
         match_api_url = f"https://asia.api.riotgames.com/tft/match/v1/matches/{match}"
         response = requests.get(match_api_url, headers={"X-Riot-Token": API_KEY})
         response.raise_for_status()
         data = response.json()
 
         file_name = exe_string + '/' + match + '_' + exe_string + '.json'
-        s3.put_object(
-            Bucket=BUCKET_NAME,
-            Key= file_name,
-            Body=json.dumps(data),
-            ContentType='application/json'
-        )
+        try:
+            s3.put_object(
+                Bucket=BUCKET_NAME,
+                Key=file_name,
+                Body=json.dumps(data),
+                ContentType='application/json'
+            )
+        except boto3.exceptions.Boto3Error as e:
+            logging.error(f"Failed to upload {file_name} to S3: {e}")
     
     return exe_string
+
+# PythonOperator 정의
+# Matching ID 목록을 가져오는 작업입니다.
+matching_id_task = PythonOperator(
+    task_id='get_matching_ids_task',
+    python_callable=process_matching_ids,
+    provide_context=True,
+    dag=dag
+)
+
 
 # PythonOperator 정의
 # 챌린저 랭킹 데이터 수집
@@ -175,9 +245,19 @@ tier_task = PythonOperator(
     dag=dag
 )
 
+# 상위 유저정보들을 하나의 리스트로 정리
+process_puuid = PythonOperator(
+    task_id = 'process_puuid_raw_data',
+    python_callable=process_puuid_data,
+    provide_context=True,
+    dag=dag
+)
+
 # matchId를 받아오는 태스트
-get_match_ids = EmptyOperator(
-    task_id='get_match_info_task',
+matching_id_task = PythonOperator(
+    task_id='get_matching_ids_task',
+    python_callable=process_matching_ids,
+    provide_context=True,
     dag=dag
 )
 
@@ -204,4 +284,4 @@ with TaskGroup(group_id='trigger_snowflake_load_dags') as trigger_group:
 
 
 # 태스크 의존성 설정
-[challenger_task, grandmaster_task, master_task, tier_task] >> s3_json_load_task >> trigger_group
+[challenger_task, grandmaster_task, master_task, tier_task] >> process_puuid >> matching_id_task >> s3_json_load_task >> trigger_group
