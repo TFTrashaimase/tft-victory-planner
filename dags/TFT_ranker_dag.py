@@ -1,38 +1,34 @@
-import json
-import os
 import logging
 import requests
 import boto3
 import time
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from airflow.operators.empty import EmptyOperator
 from datetime import datetime, timedelta
 from airflow.models import Variable
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.utils.task_group import TaskGroup
 
-# API 설정
+# Variables 읽어오기 - .env 참고
+API_KEY = Variable.get("API_KEY", default_var=None)
+BASE_URL = Variable.get("BASE_URL", default_var=None)
+QUEUE_TYPE = Variable.get("QUEUE_TYPE", default_var=None)
+BUCKET_NAME = Variable.get("BUCKET_NAME", default_var=None)
+BUCKET_REGION = Variable.get("BUCKET_REGION", default_var=None)
 
-# docker환경 변수에서 API 키 읽을 때,사용
-API_KEY = os.getenv("RIOT_API_KEY", "No API Key Provided")
+# s3 버킷 설정
+s3 = boto3.client('s3', region_name='ap-northeast-2')  # 서울 리전 
 
-# airflow Variables 사용할 때,
-# API_KEY = Variable.get("RIOT_API_KEY") # 변수 설정 후 사용
-BASE_URL = 'https://kr.api.riotgames.com'
-QUEUE_TYPE = 'RANKED_TFT'  # 솔로 랭크 큐 타입
 tiers = ["DIAMOND", "EMERALD", "PLATINUM", "GOLD", "SILVER", "BRONZE"]
 divisions = ["I", "II", "III", "IV"]
 page = 1
 MATCHES_COUNT = 20  # 한 번에 가져올 매치 수
 
-if not API_KEY or not BASE_URL:
-    raise ValueError("환경 변수 RIOT_API_KEY와 RIOT_API_BASE_URL의 확인이 필요합니다.")
-
-# s3 버킷 설정
-s3 = boto3.client('s3', region_name='ap-northeast-2')
-BUCKET_NAME = 'our_bucket_name'  # 어떻게 처리하실 건지 결정 필요합니다. => 환경변수, Variables
+if not API_KEY or not BASE_URL or not QUEUE_TYPE or not BUCKET_NAME or not BUCKET_REGION:
+    raise ValueError("환경 변수 API_KEY, BASE_URL, QUEUE_TYPE, BUCKET_NAME의 확인이 필요합니다.")
 
 # DAG 기본 설정
 default_args = {
@@ -110,7 +106,7 @@ def get_tier(**kwargs):
                 data = response.json()
 
                 if len(data) >= 100:
-                    logging.info(f"Fetched {len(data)} records for Tier={tier}, Division={division}")
+                    logging.info(f"Fetched {len(data)} records for Tier={tier}, Divisiozn={division}")
                     return data
 
             except requests.exceptions.RequestException as e:
@@ -126,7 +122,26 @@ def process_puuid_data(**kwargs):
     master_data = ti.xcom_pull(task_ids='get_master_task')
     tier_data = ti.xcom_pull(task_ids='get_tier_task')
 
-    raw_puuid_data = list(challenger_data + grandmaster_data + master_data + tier_data)
+    raw_puuid_data = list(challenger_data if challenger_data else []) + list(grandmaster_data if grandmaster_data else []) \
+        + list(master_data if master_data else []) + list(tier_data if tier_data else [])
+
+    exe_datetime = kwargs['execution_date']  # execution_date 기준으로 폴더 명을 나눔
+    exe_string = exe_datetime.strftime('%Y-%m-%d')
+    raw_puuid_data_dict = {exe_string + '_puuid_data': raw_puuid_data}
+
+    table = pa.Table.from_pydict(raw_puuid_data_dict)
+
+    buffer = pa.BufferOutputStream()
+    pq.write_table(table, buffer)
+
+    # 3. S3 업로드
+    file_name = exe_string + '/' + 'puuid' + '_' + exe_string + '.parquet'
+    s3.put_object(
+        Bucket=BUCKET_NAME,
+        Key=file_name,
+        Body=buffer.getvalue(),
+        ContentType='application/octet-stream'  # Parquet 파일에 적합한 MIME 타입
+    )
 
     return raw_puuid_data
 
@@ -138,38 +153,79 @@ def get_matching_ids(puuid, **kwargs):
         "Content-Type": "application/json;charset=utf-8"
     }
 
-    try:
-        response = requests.get(url, headers=request_header)
-        response.raise_for_status()
-        data = response.json()
+    if MATCHES_COUNT <= 200:
+        try:
+            response = requests.get(url, headers=request_header)
+            response.raise_for_status()
+            data = response.json()
 
-        if len(data) > 0:
-            logging.info(f"Fetched {len(data)} matching IDs for puuid: {puuid}")
-            return data
-        else:
-            logging.info(f"No matching IDs found for puuid: {puuid}")
+            if len(data) > 0:
+                logging.info(f"Fetched {len(data)} matching IDs for puuid: {puuid}")
+                return list(data)
+            else:
+                logging.info(f"No matching IDs found for puuid: {puuid}")
+                return []
+
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Error fetching matching IDs for puuid: {puuid}: {e}")
             return []
+    else:
+        try:
+            how_many_api_call, remain_api_call = MATCHES_COUNT // 200, MATCHES_COUNT % 200
+            full_return_data = []
+            for cnt in range(how_many_api_call):
+                time.sleep(1)
+                url = f"{BASE_URL}/tft/match/v1/matches/by-puuid/{puuid}/ids?start={cnt * 200}&count={MATCHES_COUNT}"
+                response = requests.get(url)
+                response.raise_for_status()
+                data = response.json()
+                full_return_data += list(data)
+            
+            url = f"{BASE_URL}/tft/match/v1/matches/by-puuid/{puuid}/ids?start={(cnt + 1) * 200}&count={remain_api_call}"
+            response = requests.get(url)
+            response.raise_for_status()
+            data = response.json()
+            full_return_data += list(data)
 
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Error fetching matching IDs for puuid: {puuid}: {e}")
-        return []
+            if len(full_return_data) > 0:
+                logging.info(f"Fetched {len(full_return_data)} matching IDs for puuid: {puuid}")
+                return list(full_return_data)
+            else:
+                logging.info(f"No matching IDs found for puuid: {puuid}")
+                return []
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Error fetching matching IDs for puuid: {puuid}: {e}")
+            return []
 
 # matching id를 하나의 리스트로 정리
 def process_matching_ids(**kwargs):
     # TFT_ranker_dag.py의 process_data_task에서 puuid_list를 가져옵니다 (XCom을 사용)
     puuid_list = kwargs['ti'].xcom_pull(task_ids='process_data_task')  # 'process_data_task' 사용
-    full_matching_ids = []
+    exe_datetime = kwargs['execution_date']  # execution_date 기준으로 폴더 명을 나눔
+    exe_string = exe_datetime.strftime('%Y-%m-%d')
+    full_matching_ids = dict(zip(puuid_list, [0] * len(puuid_list)))
 
     if puuid_list:
         for puuid in puuid_list:
             # puuid에 대해 matching ID를 가져옵니다
             time.sleep(1)
             matching_ids = get_matching_ids(puuid)
-            full_matching_ids += matching_ids
+            full_matching_ids[exe_string + '_' + puuid + '_' + 'matching_id'] = matching_ids
             logging.info(f"Matching IDs for puuid {puuid}: {matching_ids}")
+        
+        table = pa.Table.from_pydict(full_matching_ids)
+        file_name = exe_string + '/' + 'matching_ids' + '_' + exe_string + '.parquet'
+        buffer = pa.BufferOutputStream()
+        pq.write_table(table, buffer)
+        s3.put_object(
+            Bucket=BUCKET_NAME,
+            Key=file_name,
+            Body=buffer.getvalue(),
+            ContentType='application/octet-stream' # Parquet 파일은 이진 형식이므로 이 MIME 타입을 사용하여 파일을 전송한다.
+        )
     else:
         logging.error(f"{puuid}: No match data for this puuid found from process_data_task in TFT_ranker_dag.py")
-    
+
     return full_matching_ids
 
 # s3에 적재
@@ -189,28 +245,23 @@ def load_json_to_s3(**kwargs):
         response.raise_for_status()
         data = response.json()
 
-        file_name = exe_string + '/' + match + '_' + exe_string + '.json'
+        file_name = exe_string + '/' + match + '_' + exe_string + '.parquet'
         try:
+            # json을 PyArrow로 변환 후 S3에 업로드
+            table = pa.Table.from_pylist(data)
+            buffer = pa.BufferOutputStream()
+            pq.write_table(table, buffer)
             s3.put_object(
                 Bucket=BUCKET_NAME,
                 Key=file_name,
-                Body=json.dumps(data),
-                ContentType='application/json'
+                Body=buffer.getvalue(),
+                ContentType='application/octet-stream' # Parquet 파일은 이진 형식이므로 이 MIME 타입을 사용하여 파일을 전송한다.
             )
+            logging.info(f"Successfully uploaded {file_name} to S3.")
         except boto3.exceptions.Boto3Error as e:
             logging.error(f"Failed to upload {file_name} to S3: {e}")
     
     return exe_string
-
-# PythonOperator 정의
-# Matching ID 목록을 가져오는 작업입니다.
-matching_id_task = PythonOperator(
-    task_id='get_matching_ids_task',
-    python_callable=process_matching_ids,
-    provide_context=True,
-    dag=dag
-)
-
 
 # PythonOperator 정의
 # 챌린저 랭킹 데이터 수집
