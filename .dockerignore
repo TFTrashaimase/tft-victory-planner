@@ -6,9 +6,9 @@ __pycache__/
 .Python
 *.swp
 
-# 환경 설정 파일
-.env
-*.env
+; # 환경 설정 파일
+; .env
+; *.env
 
 # Git 정보
 .git

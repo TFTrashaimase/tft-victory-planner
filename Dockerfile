@@ -21,7 +21,7 @@ ENV _PIP_ADDITIONAL_REQUIREMENTS=${_PIP_ADDITIONAL_REQUIREMENTS:-pandas}
 # RUN echo "airflow:airflow" | chpasswd
 
 # Copy custom setup scripts or files (like setup_vim.sh)
-COPY ./mysettings/setup_vim.sh /opt/airflow/mysettings/setup_vim.sh
+# COPY ./mysettings/setup_vim.sh /opt/airflow/mysettings/setup_vim.sh
 
 # Make sure the script is executable
 # RUN chmod +x /opt/airflow/mysettings/setup_vim.sh
