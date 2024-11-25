@@ -24,6 +24,8 @@ x-airflow-common:
     AIRFLOW_VAR_BASE_URL: ${BASE_URL}
     AIRFLOW_VAR_QUEUE_TYPE: ${QUEUE_TYPE}
     AIRFLOW_VAR_API_KEY: ${API_KEY}
+    AIRFLOW_VAR_AWS_ACCESS_KEY: ${AWS_ACCESS_KEY}
+    AIRFLOW_VAR_AWS_SECRET_KEY: ${AWS_SECRET_KEY}
     # yamllint disable rule:line-length
     # Use simple http server on scheduler for health checks
     # See https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/logging-monitoring/check-health.html#scheduler-health-check-server

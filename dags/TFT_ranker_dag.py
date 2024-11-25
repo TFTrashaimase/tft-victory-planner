@@ -6,6 +6,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import io
 
+from itertools import repeat
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
@@ -19,9 +20,11 @@ BASE_URL = Variable.get("BASE_URL", default_var=None)
 QUEUE_TYPE = Variable.get("QUEUE_TYPE", default_var=None)
 BUCKET_NAME = Variable.get("BUCKET_NAME", default_var=None)
 BUCKET_REGION = Variable.get("BUCKET_REGION", default_var=None)
+AWS_ACCESS_KEY_ID = Variable.get("AWS_ACCESS_KEY", default_var=None)
+AWS_SECRET_ACCESS_KEY = Variable.get("AWS_SECRET_KEY", default_var=None)
 
 # s3 버킷 설정
-s3 = boto3.client('s3', region_name='ap-northeast-2')  # 서울 리전 
+s3 = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY_ID, aws_secret_access_key=AWS_SECRET_ACCESS_KEY, region_name='ap-northeast-2')  # 서울 리전 
 
 tiers = ["DIAMOND", "EMERALD", "PLATINUM", "GOLD", "SILVER", "BRONZE"]
 divisions = ["I", "II", "III", "IV"]
@@ -187,10 +190,9 @@ def process_puuid_data(**kwargs):
 
 # API를 호출하여 Matching ID 목록을 가져오는 함수
 def get_matching_ids(puuid, **kwargs):
-    url = f"{BASE_URL}/tft/match/v1/matches/by-puuid/{puuid}/ids?start=0&count={MATCHES_COUNT}"
+    url = f"https://asia.api.riotgames.com/tft/match/v1/matches/by-puuid/{puuid}/ids?start=0&count={MATCHES_COUNT}"
     request_header = {
-        "X-Riot-Token": API_KEY,
-        "Content-Type": "application/json;charset=utf-8"
+        "X-Riot-Token": API_KEY
     }
 
     if MATCHES_COUNT <= 200:
@@ -236,23 +238,41 @@ def get_matching_ids(puuid, **kwargs):
         except requests.exceptions.RequestException as e:
             logging.error(f"Error fetching matching IDs for puuid: {puuid}: {e}")
             return []
+        
+
+# 딕셔너리 길이를 맞추어 주는 친구
+def pad_dict_to_max_length(data_dict, pad_value=None):
+    # 최대 길이 계산
+    max_length = max(len(lst) for lst in data_dict.values())
+    
+    # 각 리스트를 최대 길이로 패딩
+    padded_dict = {
+        key: lst + list(repeat(pad_value, max_length - len(lst)))
+        for key, lst in data_dict.items()
+    }
+    
+    return padded_dict
+
 
 # matching id를 하나의 리스트로 정리
 def process_matching_ids(**kwargs):
     # TFT_ranker_dag.py의 process_data_task에서 puuid_list를 가져옵니다 (XCom을 사용)
-    puuid_list = kwargs['ti'].xcom_pull(task_ids='process_data_task')  # 'process_data_task' 사용
+    puuid_list = kwargs['ti'].xcom_pull(task_ids='process_puuid_raw_data')  # 'process_data_task' 사용
     exe_datetime = kwargs['execution_date']  # execution_date 기준으로 폴더 명을 나눔
     exe_string = exe_datetime.strftime('%Y-%m-%d')
-    full_matching_ids = dict(zip(puuid_list, [0] * len(puuid_list)))
+    full_matching_ids = dict(zip([user['puuid'] for user in puuid_list], [[]] * len(puuid_list)))
 
     if puuid_list:
-        for puuid in puuid_list:
+        for user in puuid_list:
+            puuid = user['puuid']
             # puuid에 대해 matching ID를 가져옵니다
             time.sleep(1)
             matching_ids = get_matching_ids(puuid)
             full_matching_ids[exe_string + '_' + puuid + '_' + 'matching_id'] = matching_ids
             logging.info(f"Matching IDs for puuid {puuid}: {matching_ids}")
         
+        full_matching_ids = pad_dict_to_max_length(full_matching_ids)
+
         table = pa.Table.from_pydict(full_matching_ids)
         file_name = exe_string + '/' + 'matching_ids' + '_' + exe_string + '.parquet'
         buffer = io.BytesIO()
@@ -270,6 +290,49 @@ def process_matching_ids(**kwargs):
 
     return full_matching_ids
 
+# 값들의 길이를 동일하게 맞추는 함수
+def ensure_uniform_length(data, target_length):
+    """
+    데이터를 주어진 길이로 맞춥니다.
+    """
+    if isinstance(data, list):
+        return data + list(repeat(None, target_length - len(data)))
+    elif isinstance(data, dict):
+        return [data] + list(repeat(None, target_length - 1))
+    else:
+        return [data] + list(repeat(None, target_length - 1))
+
+# 모든 값을 리스트로 변환하고 길이를 동일하게 맞춤
+def normalize_json(data):
+    """
+    JSON 데이터를 PyArrow로 변환 가능한 형태로 정규화합니다.
+    """
+    # 모든 값을 리스트로 변환
+    for key in data:
+        if not isinstance(data[key], list):
+            data[key] = [data[key]]  # 리스트로 변환
+
+    # 최대 길이 계산
+    max_length = max(len(value) for value in data.values())
+
+    # 모든 값을 동일한 길이로 맞춤
+    for key in data:
+        data[key] = ensure_uniform_length(data[key], max_length)
+
+    return data
+
+# 중첩 JSON 처리
+def process_nested_json(data):
+    """
+    중첩된 JSON 데이터를 처리합니다.
+    """
+    if isinstance(data, dict):
+        return {k: process_nested_json(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [process_nested_json(item) if isinstance(item, (dict, list)) else item for item in data]
+    else:
+        return data
+
 # s3에 적재
 def load_json_to_s3(**kwargs):
     exe_datetime = kwargs['execution_date']  # execution_date 기준으로 폴더 명을 나눔
@@ -280,30 +343,38 @@ def load_json_to_s3(**kwargs):
         logging.info("No match data to process")
         return exe_string
 
-    for match in match_data:
-        time.sleep(1)
-        match_api_url = f"https://asia.api.riotgames.com/tft/match/v1/matches/{match}"
-        response = requests.get(match_api_url, headers={"X-Riot-Token": API_KEY})
-        response.raise_for_status()
-        data = response.json()
 
-        file_name = exe_string + '/' + match + '_' + exe_string + '.parquet'
-        try:
-            # json을 PyArrow로 변환 후 S3에 업로드
-            table = pa.Table.from_pydict(data)
-            buffer = io.BytesIO()
-            pq.write_table(table, buffer)
-            buffer.seek(0)  # 버퍼 포인터를 처음으로 이동
-            buffer_writer = buffer.getvalue()
-            s3.put_object(
-                Bucket=BUCKET_NAME,
-                Key=file_name,
-                Body=bytes(buffer_writer),
-                ContentType='application/octet-stream' # Parquet 파일은 이진 형식이므로 이 MIME 타입을 사용하여 파일을 전송한다.
-            )
-            logging.info(f"Successfully uploaded {file_name} to S3.")
-        except boto3.exceptions.Boto3Error as e:
-            logging.error(f"Failed to upload {file_name} to S3: {e}")
+    for user in match_data.keys():
+        time.sleep(0.5)
+        matches = match_data[user]
+
+        for match in matches:
+            if match is None:
+                continue
+            time.sleep(0.5)
+            match_api_url = f"https://asia.api.riotgames.com/tft/match/v1/matches/{match}"
+            response = requests.get(match_api_url, headers={"X-Riot-Token": API_KEY})
+            response.raise_for_status()
+            data = response.json()
+
+            file_name = exe_string + '/match_infos/' + user + '_' + match + '_' + exe_string + '.parquet'
+            try:
+                # json을 PyArrow로 변환 후 S3에 업로드
+                data = normalize_json(process_nested_json(data))
+                table = pa.Table.from_pydict(data)
+                buffer = io.BytesIO()
+                pq.write_table(table, buffer)
+                buffer.seek(0)  # 버퍼 포인터를 처음으로 이동
+                buffer_writer = buffer.getvalue()
+                s3.put_object(
+                    Bucket=BUCKET_NAME,
+                    Key=file_name,
+                    Body=bytes(buffer_writer),
+                    ContentType='application/octet-stream' # Parquet 파일은 이진 형식이므로 이 MIME 타입을 사용하여 파일을 전송한다.
+                )
+                logging.info(f"Successfully uploaded {file_name} to S3.")
+            except boto3.exceptions.Boto3Error as e:
+                logging.error(f"Failed to upload {file_name} to S3: {e}")
     
     return exe_string
 
@@ -381,19 +452,19 @@ with DAG(
     )
 
     # 트리거할 DAG ID 리스트
-    dag_ids_to_trigger = ['dag_ids_to_transform_and_load_data_to_snowflake']
+    # dag_ids_to_trigger = ['dag_ids_to_transform_and_load_data_to_snowflake']
 
-    with TaskGroup(group_id='trigger_snowflake_load_dags') as trigger_group:
-        for dag_id in dag_ids_to_trigger:
-            conf = {
-                    "s3_bucket_folder": "{{ task_instance.xcom_pull(task_ids='load_json_to_s3') }}",
-                    "triggered_by": "trigger_dynamic_dags", 
-                    "triggered_dag": dag_id,
-                    "execution_date": "{{ execution_date.isoformat() }}",
-                }
-            TriggerDagRunOperator(task_id=f'trigger_{dag_id}', trigger_dag_id=dag_id, conf=conf)
+    # with TaskGroup(group_id='trigger_snowflake_load_dags') as trigger_group:
+    #     for dag_id in dag_ids_to_trigger:
+    #         conf = {
+    #                 "s3_bucket_folder": "{{ task_instance.xcom_pull(task_ids='load_json_to_s3') }}",
+    #                 "triggered_by": "trigger_dynamic_dags", 
+    #                 "triggered_dag": dag_id,
+    #                 "execution_date": "{{ execution_date.isoformat() }}",
+    #             }
+    #         TriggerDagRunOperator(task_id=f'trigger_{dag_id}', trigger_dag_id=dag_id, conf=conf)
 
 
 # 태스크 의존성 설정
 
-[challenger_task, grandmaster_task, master_task, tier_task] >> process_puuid >> matching_id_task >> s3_json_load_task >> trigger_group
+[challenger_task, grandmaster_task, master_task, tier_task] >> process_puuid >> matching_id_task >> s3_json_load_task # >> trigger_group
