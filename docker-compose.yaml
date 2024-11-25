@@ -42,8 +42,6 @@ x-airflow-common:
       condition: service_healthy
     postgres:
       condition: service_healthy
-#  command: >
-#     bash -c "pip install -r /opt/airflow/mysettings/requirements.txt && airflow scheduler"
 
 services:
   postgres:
@@ -97,8 +95,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: >
-      bash -c "/opt/airflow/mysettings/setup_vim.sh && airflow scheduler"
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
       interval: 30s
