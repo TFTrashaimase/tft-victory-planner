@@ -1,12 +1,16 @@
 import json
 import os
 import logging
+import requests
+import boto3
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+from airflow.operators.empty import EmptyOperator
 from datetime import datetime, timedelta
 from airflow.models import Variable
-import requests
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
+from airflow.utils.task_group import TaskGroup
 
 # API 설정
 
@@ -23,6 +27,10 @@ page = 1
 
 if not API_KEY or not BASE_URL:
     raise ValueError("환경 변수 RIOT_API_KEY와 RIOT_API_BASE_URL의 확인이 필요합니다.")
+
+# s3 버킷 설정
+s3 = boto3.client('s3', region_name='ap-northeast-2')
+BUCKET_NAME = 'our_bucket_name'  # 어떻게 처리하실 건지 결정 필요합니다. => 환경변수, Variables
 
 # DAG 기본 설정
 default_args = {
@@ -108,6 +116,32 @@ def get_tier(**kwargs):
                 continue
     return data
 
+# s3에 적재
+def load_json_to_s3(**kwargs):
+    exe_datetime = kwargs['execution_date']  # execution_date 기준으로 폴더 명을 나눔
+    exe_string = exe_datetime.strftime('%Y-%m-%d')
+    match_data = kwargs['ti'].xcom_pull(task_ids='get_match_info_task')  # 매치데이터를 받아옴
+
+    if not match_data:
+        logging.info("No match data to process")
+        return exe_string
+
+    for match in match_data:
+        match_api_url = f"https://asia.api.riotgames.com/tft/match/v1/matches/{match}"
+        response = requests.get(match_api_url, headers={"X-Riot-Token": API_KEY})
+        response.raise_for_status()
+        data = response.json()
+
+        file_name = exe_string + '/' + match + '_' + exe_string + '.json'
+        s3.put_object(
+            Bucket=BUCKET_NAME,
+            Key= file_name,
+            Body=json.dumps(data),
+            ContentType='application/json'
+        )
+    
+    return exe_string
+
 # PythonOperator 정의
 # 챌린저 랭킹 데이터 수집
 challenger_task = PythonOperator(
@@ -141,26 +175,33 @@ tier_task = PythonOperator(
     dag=dag
 )
 
-# 다음 태스크에서 XCom 데이터를 활용시 사용 함수
-def process_data(**kwargs):
-    challenger_data = kwargs['ti'].xcom_pull(task_ids='get_challenger_task')
-    grandmaster_data = kwargs['ti'].xcom_pull(task_ids='get_grandmaster_task')
-    master_data = kwargs['ti'].xcom_pull(task_ids='get_master_task')
-    tier_data = kwargs['ti'].xcom_pull(task_ids='get_tier_task')
+# matchId를 받아오는 태스트
+get_match_ids = EmptyOperator(
+    task_id='get_match_info_task',
+    dag=dag
+)
 
-    # 여기서 데이터를 처리하거나 다른 작업 수행 가능
-    logging.info("Challenger Data: %s", challenger_data)
-    logging.info("Grandmaster Data: %s", grandmaster_data)
-    logging.info("Master Data: %s", master_data)
-    logging.info("Tier Data: %s", tier_data)
-
-# 데이터 처리 함수
-process_task = PythonOperator(
-    task_id='process_data_task',
-    python_callable=process_data,
+# s3에 업로드하는 task
+s3_json_load_task = PythonOperator(
+    task_id='load_json_to_s3',
+    python_callable=load_json_to_s3,
     provide_context=True,
     dag=dag
 )
 
+# 트리거할 DAG ID 리스트
+dag_ids_to_trigger = ['dag_ids_to_transform_and_load_data_to_snowflake']
+
+with TaskGroup(group_id='trigger_snowflake_load_dags') as trigger_group:
+    for dag_id in dag_ids_to_trigger:
+        conf = {
+                "s3_bucket_folder": "{{ task_instance.xcom_pull(task_ids='load_json_to_s3') }}",
+                "triggered_by": "trigger_dynamic_dags", 
+                "triggered_dag": dag_id,
+                "execution_date": "{{ execution_date.isoformat() }}",
+            }
+        TriggerDagRunOperator(task_id=f'trigger_{dag_id}', trigger_dag_id=dag_id, conf=conf)
+
+
 # 태스크 의존성 설정
-[challenger_task, grandmaster_task, master_task, tier_task] >> process_task
+[challenger_task, grandmaster_task, master_task, tier_task] >> s3_json_load_task >> trigger_group
