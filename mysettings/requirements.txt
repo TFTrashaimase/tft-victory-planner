@@ -24,3 +24,12 @@ sqlalchemy
 
 # dbt-snowflake
 dbt-snowflake==1.7.1
+
+# boto3
+boto3
+
+# pyarrow
+pyarrow
+
+# pandas
+pandas
