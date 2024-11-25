@@ -1,0 +1,26 @@
+# flake8
+flake8==6.1.0
+
+# black
+black==23.9.1
+
+# sqlfluff
+sqlfluff==2.1.0
+
+# snowflake-connector-python
+snowflake-connector-python==3.10.0
+
+# pyopenssl
+pyopenssl==24.2.1
+
+# apache-airflow-providers-mysql
+apache-airflow-providers-mysql==5.7.0
+
+# oauth2client
+oauth2client
+
+# sqlalchemy
+sqlalchemy
+
+# dbt-snowflake
+dbt-snowflake==1.7.1
