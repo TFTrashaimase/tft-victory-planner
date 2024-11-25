@@ -7,7 +7,7 @@ __pycache__/
 *.swp
 
 # 환경 설정 파일
-.env
+.env RIOT_API_KEY=""
 *.env
 
 # Git 정보
