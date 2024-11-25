@@ -42,8 +42,8 @@ x-airflow-common:
       condition: service_healthy
     postgres:
       condition: service_healthy
-  command: >
-    bash -c "pip install -r /opt/airflow/mysettings/requirements.txt && airflow scheduler"
+#  command: >
+#     bash -c "pip install -r /opt/airflow/mysettings/requirements.txt && airflow scheduler"
 
 services:
   postgres:

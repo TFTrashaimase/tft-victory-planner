@@ -24,10 +24,10 @@ RUN echo "airflow:airflow" | chpasswd
 COPY ./mysettings/setup_vim.sh /opt/airflow/mysettings/setup_vim.sh
 
 # Make sure the script is executable
-RUN chmod +x /opt/airflow/mysettings/setup_vim.sh
+# RUN chmod +x /opt/airflow/mysettings/setup_vim.sh
 
 # Set the command for the scheduler service (overrides the default entrypoint)
-CMD ["bash", "-c", "/opt/airflow/mysettings/setup_vim.sh && airflow scheduler"]
+# CMD ["bash", "-c", "/opt/airflow/mysettings/setup_vim.sh && airflow scheduler"]
 
 # airflow 유저로 복귀
 USER airflow
