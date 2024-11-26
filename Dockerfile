@@ -31,8 +31,8 @@ ENV _PIP_ADDITIONAL_REQUIREMENTS=${_PIP_ADDITIONAL_REQUIREMENTS:-pandas}
 # CMD ["bash", "-c", "/opt/airflow/mysettings/setup_vim.sh && airflow scheduler"]
 
 # dbt위한 git 설치
-# USER root
-# RUN apt-get update && apt-get install -y git && apt-get clean
+USER root
+RUN apt-get update && apt-get install -y git && apt-get clean
 
 # airflow 유저로 복귀
 USER airflow
