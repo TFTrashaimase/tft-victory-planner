@@ -11,8 +11,7 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 from airflow.models import Variable
-from airflow.operators.trigger_dagrun import TriggerDagRunOperator  # 나중에 필요함
-from airflow.utils.task_group import TaskGroup  # 나중에 필요함
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 
 # Variables 읽어오기 - .env 참고
 API_KEY = Variable.get("API_KEY", default_var=None)
@@ -396,6 +395,7 @@ def matching_info_to_s3(**kwargs):
     
     return exe_string
 
+
 # DAG 기본 설정
 default_args = {
     'start_date': datetime(2024, 1, 1),
@@ -469,20 +469,12 @@ with DAG(
         dag=dag
     )
 
-    # 트리거할 DAG ID 리스트
-    # dag_ids_to_trigger = ['dag_ids_to_transform_and_load_data_to_snowflake']
-
-    # with TaskGroup(group_id='trigger_snowflake_load_dags') as trigger_group:
-    #     for dag_id in dag_ids_to_trigger:
-    #         conf = {
-    #                 "s3_bucket_folder": "{{ task_instance.xcom_pull(task_ids='load_json_to_s3') }}",
-    #                 "triggered_by": "trigger_dynamic_dags", 
-    #                 "triggered_dag": dag_id,
-    #                 "execution_date": "{{ execution_date.isoformat() }}",
-    #             }
-    #         TriggerDagRunOperator(task_id=f'trigger_{dag_id}', trigger_dag_id=dag_id, conf=conf)
-
+    trigger_snowflake_dag = TriggerDagRunOperator(
+        task_id='trigger_snowflake_dag',
+        trigger_dag_id='snowflake_load_dag',  # Snowflake로 적재되는 DAG 이름
+        conf={},
+    )
 
 # 태스크 의존성 설정
 
-[challenger_task, grandmaster_task, master_task, tier_task] >> process_puuid >> matching_id_task >> matching_info_to_s3_task # >> trigger_group
+[challenger_task, grandmaster_task, master_task, tier_task] >> process_puuid >> matching_id_task >> matching_info_to_s3_task >> trigger_snowflake_dag

@@ -16,6 +16,9 @@ pyopenssl==24.2.1
 # apache-airflow-providers-mysql
 apache-airflow-providers-mysql==5.7.0
 
+# apache-airflow[snowflake]
+apache-airflow[snowflake]==2.9.1
+
 # oauth2client
 oauth2client
 
