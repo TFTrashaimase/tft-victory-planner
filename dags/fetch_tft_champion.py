@@ -105,7 +105,7 @@ def save_to_s3(**kwargs):
         s3_client.put_object(
             Bucket=s3_bucket_name,
             Key=file_name,
-            Body=parquet_data,
+            Body=parquet_buffer,
             ContentType='application/octet-stream'
         )
         logger.info(f"success: S3에 데이터 업로드 완료 - //{s3_bucket_name}/{file_name}")
@@ -134,7 +134,7 @@ with DAG(
     tags=['riot', 'tft', 'champion']
 ) as dag:
 
-    fetch_data_task = PythonOperator(
+    fetch_champions_data_task = PythonOperator(
         task_id='fetch_data',
         python_callable=fetch_data,
         provide_context=True,
@@ -152,4 +152,4 @@ with DAG(
         provide_context=True,
     )
 
-    fetch_data_task >> transform_to_parquet_task >> save_to_s3_task
+    fetch_champions_data_task >> transform_to_parquet_task >> save_to_s3_task
