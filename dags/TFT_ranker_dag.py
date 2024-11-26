@@ -11,8 +11,8 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 from airflow.models import Variable
-from airflow.operators.trigger_dagrun import TriggerDagRunOperator
-from airflow.utils.task_group import TaskGroup
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator  # 나중에 필요함
+from airflow.utils.task_group import TaskGroup  # 나중에 필요함
 
 # Variables 읽어오기 - .env 참고
 API_KEY = Variable.get("API_KEY", default_var=None)
@@ -26,15 +26,35 @@ AWS_SECRET_ACCESS_KEY = Variable.get("AWS_SECRET_KEY", default_var=None)
 # s3 버킷 설정
 s3 = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY_ID, aws_secret_access_key=AWS_SECRET_ACCESS_KEY, region_name='ap-northeast-2')  # 서울 리전 
 
+# 상수 정의
 tiers = ["DIAMOND", "EMERALD", "PLATINUM", "GOLD", "SILVER", "BRONZE"]
 divisions = ["I", "II", "III", "IV"]
 page = 1
-MATCHES_COUNT = 20  # 한 번에 가져올 매치 수
+MATCHES_COUNT = 20  # 한 번에 가져올 매치 수, 원한다면 수정해서 작업. 
 
-if not API_KEY or not BASE_URL or not QUEUE_TYPE or not BUCKET_NAME or not BUCKET_REGION:
-    raise ValueError("환경 변수 API_KEY, BASE_URL, QUEUE_TYPE, BUCKET_NAME의 확인이 필요합니다.")
+# Variables가 없다면 에러 발생
+if not API_KEY:
+    raise ValueError("환경 변수 API_KEY의 확인이 필요합니다.")
 
-# Summoner ID에 따른 데이터 수집
+if not BASE_URL:
+    raise ValueError("환경 변수 BASE_URL의 확인이 필요합니다.")
+
+if not QUEUE_TYPE:
+    raise ValueError("환경 변수 QUEUE_TYPE의 확인이 필요합니다.")
+
+if not BUCKET_NAME: 
+    raise ValueError("환경 변수 BUCKET_NAME의 확인이 필요합니다.")
+
+if not BUCKET_REGION:
+    raise ValueError("환경 변수 BUCKET_REGION의 확인이 필요합니다.")
+
+if not AWS_ACCESS_KEY_ID:
+    raise ValueError("환경 변수 AWS_ACCESS_KEY_ID의 확인이 필요합니다.")
+
+if not AWS_SECRET_ACCESS_KEY:
+    raise ValueError("환경 변수 AWS_SECRET_ACCESS_KEY의 확인이 필요합니다.")
+
+# Summoner ID로 유저 데이터를 수집하는 함수 - 챌린저, 그랜드 마스터, 마스터
 def get_entries_by_summoner(summoner_id, **kwargs):
     url = f"{BASE_URL}/tft/league/v1/entries/by-summoner/{summoner_id}"
 
@@ -50,10 +70,9 @@ def get_entries_by_summoner(summoner_id, **kwargs):
             return None
     except requests.exceptions.RequestException as e:
         logging.error(f"Error fetching data for Summoner ID {summoner_id}: {e}")
-        return None
+        raise
 
-# 데이터 수집 함수
-# 챌린저 유저 SummonerId 수집
+# 챌린저 유저 SummonerId를 받아와서 다른 api를 통해 puuid를 포함한 유저 데이터를 반환
 def get_challenger(**kwargs):
     url = f"{BASE_URL}/tft/league/v1/challenger?queue={QUEUE_TYPE}"
     try:
@@ -79,7 +98,7 @@ def get_challenger(**kwargs):
         logging.error(f"Error fetching Challenger data: {e}")
         return None
 
-# 그랜드마스터 SummonerId 수집
+# 그랜드 마스터 유저 SummonerId를 받아와서 다른 api를 통해 puuid를 포함한 유저 데이터를 반환
 def get_grandmaster(**kwargs):
     url = f"{BASE_URL}/tft/league/v1/grandmaster?queue={QUEUE_TYPE}"
     try:
@@ -104,7 +123,7 @@ def get_grandmaster(**kwargs):
         logging.error(f"Error fetching Grandmaster data: {e}")
         return None
 
-# 마스터 유저 SummonerId 수집
+# 마스터 유저 SummonerId를 받아와서 다른 api를 통해 puuid를 포함한 유저 데이터를 반환
 def get_master(**kwargs):
     url = f"{BASE_URL}/tft/league/v1/master?queue={QUEUE_TYPE}"
     try:
@@ -129,7 +148,7 @@ def get_master(**kwargs):
         logging.error(f"Error fetching Master data: {e}")
         return None
 
-# 티어 랭킹 top100+데이터 수집
+# 챌린저, 그랜드 마스터, 마스터까지 상위 랭크 유저가 100명이 되지 않는다면 100명 이상의 정보를 모으기 위해 그 아래 티어를 호출
 def get_tier(**kwargs):  
     for tier in tiers:
         for division in divisions:
@@ -148,7 +167,8 @@ def get_tier(**kwargs):
                 continue
     return data
 
-# 티어별 puuid를 합친 리스트를 제공
+# 상위 랭커들의 puuid 포함한 정보를 합쳐서 하나의 리스트로 반환
+# 이 과정에서 100 + 알파 명의 유저의 정보 역시 S3에 parquet으로 업로드
 def process_puuid_data(**kwargs):
     ti = kwargs['ti']
     challenger_data = ti.xcom_pull(task_ids='get_challenger_task')
@@ -188,7 +208,7 @@ def process_puuid_data(**kwargs):
 
     return raw_puuid_data
 
-# API를 호출하여 Matching ID 목록을 가져오는 함수
+# 상위 랭커들의 puuid 기반으로 API를 호출하여 Matching ID 목록을 가져오는 함수
 def get_matching_ids(puuid, **kwargs):
     url = f"https://asia.api.riotgames.com/tft/match/v1/matches/by-puuid/{puuid}/ids?start=0&count={MATCHES_COUNT}"
     request_header = {
@@ -240,7 +260,7 @@ def get_matching_ids(puuid, **kwargs):
             return []
         
 
-# 딕셔너리 길이를 맞추어 주는 친구
+# 딕셔너리 길이를 맞추어 주는 helper function
 def pad_dict_to_max_length(data_dict, pad_value=None):
     # 최대 길이 계산
     max_length = max(len(lst) for lst in data_dict.values())
@@ -290,11 +310,8 @@ def process_matching_ids(**kwargs):
 
     return full_matching_ids
 
-# 값들의 길이를 동일하게 맞추는 함수
+# 값들의 길이를 동일하게 맞추는 헬퍼 함수
 def ensure_uniform_length(data, target_length):
-    """
-    데이터를 주어진 길이로 맞춥니다.
-    """
     if isinstance(data, list):
         return data + list(repeat(None, target_length - len(data)))
     elif isinstance(data, dict):
@@ -303,10 +320,9 @@ def ensure_uniform_length(data, target_length):
         return [data] + list(repeat(None, target_length - 1))
 
 # 모든 값을 리스트로 변환하고 길이를 동일하게 맞춤
+# 딕셔너리, 그냥 스칼라는 그냥 리스트에 넣고 None을 길이에 맞추어 패딩
+# 리스트는 최대 길이에 맞춰 None을 넣어 패딩
 def normalize_json(data):
-    """
-    JSON 데이터를 PyArrow로 변환 가능한 형태로 정규화합니다.
-    """
     # 모든 값을 리스트로 변환
     for key in data:
         if not isinstance(data[key], list):
@@ -334,7 +350,7 @@ def process_nested_json(data):
         return data
 
 # s3에 적재
-def load_json_to_s3(**kwargs):
+def matching_info_to_s3(**kwargs):
     exe_datetime = kwargs['execution_date']  # execution_date 기준으로 폴더 명을 나눔
     exe_string = exe_datetime.strftime('%Y-%m-%d')
     match_data = kwargs['ti'].xcom_pull(task_ids='get_matching_ids_task')  # 매치데이터를 받아옴
@@ -348,7 +364,9 @@ def load_json_to_s3(**kwargs):
         time.sleep(0.5)
         matches = match_data[user]
 
-        for match in matches:
+        for cnt, match in enumerate(matches):
+            if cnt % 50 == 0 and cnt > 0:
+                time.sleep(30)
             if match is None:
                 continue
             time.sleep(0.5)
@@ -444,9 +462,9 @@ with DAG(
     )
 
     # s3에 업로드하는 task
-    s3_json_load_task = PythonOperator(
-        task_id='load_json_to_s3',
-        python_callable=load_json_to_s3,
+    matching_info_to_s3_task = PythonOperator(
+        task_id='matching_info_to_s3_task',
+        python_callable=matching_info_to_s3,
         provide_context=True,
         dag=dag
     )
@@ -467,4 +485,4 @@ with DAG(
 
 # 태스크 의존성 설정
 
-[challenger_task, grandmaster_task, master_task, tier_task] >> process_puuid >> matching_id_task >> s3_json_load_task # >> trigger_group
+[challenger_task, grandmaster_task, master_task, tier_task] >> process_puuid >> matching_id_task >> matching_info_to_s3_task # >> trigger_group
