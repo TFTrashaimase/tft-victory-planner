@@ -1,0 +1,13 @@
+test_snowflake:
+  outputs:
+    dev:
+      account: uiqmasv-qub95347
+      database: TFTPROJECT_TEAM2
+      password: Dnflskfk135!
+      role: ACCOUNTADMIN
+      threads: 1
+      schema: TFT
+      type: snowflake
+      user: EHDGML7755
+      warehouse: COMPUTE_WH
+  target: dev
