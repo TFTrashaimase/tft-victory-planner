@@ -366,7 +366,7 @@ def matching_info_to_s3(**kwargs):
 
         for cnt, match in enumerate(matches):
             if cnt % 50 == 0 and cnt > 0:
-                time.sleep(30)
+                time.sleep(60)
             if match is None:
                 continue
             time.sleep(0.5)
