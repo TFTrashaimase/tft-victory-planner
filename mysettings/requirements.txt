@@ -33,3 +33,6 @@ pyarrow
 
 # pandas
 pandas
+
+# dbt-core
+dbt-core
