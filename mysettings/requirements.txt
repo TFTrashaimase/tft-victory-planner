@@ -36,3 +36,6 @@ pyarrow
 
 # pandas
 pandas
+
+# botocore
+botocore==1.35.69
