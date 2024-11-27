@@ -4,7 +4,10 @@
 ) }}
 
 WITH bronze_data AS (
-    SELECT DISTINCT * FROM {{ ref('raw_data_src') }}
+    SELECT DISTINCT
+        *
+    FROM
+        {{ ref('raw_data_src') }}
 )
 SELECT
     -- JSON 데이터에서 추출
@@ -25,8 +28,6 @@ SELECT
         WHEN p.value:placement = 1 THEN TRUE
         ELSE FALSE
     END AS win,
-
-    -- 생성 시간 삽입
     CURRENT_TIMESTAMP() AS created_at
 FROM bronze_data,
 LATERAL FLATTEN(INPUT => json_data:info:participants) p,

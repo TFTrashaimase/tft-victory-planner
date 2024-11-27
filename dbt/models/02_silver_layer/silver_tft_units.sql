@@ -4,7 +4,10 @@
 ) }}
 
 WITH bronze_tft_champion_data AS (
-    SELECT * FROM {{ ref('bronze_tft_champion_data_src') }}
+    SELECT 
+        *
+    FROM
+        {{ ref('bronze_tft_champion_data_src') }}
 ),
 flattened_data AS (
     SELECT
