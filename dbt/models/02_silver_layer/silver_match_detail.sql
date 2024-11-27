@@ -1,6 +1,6 @@
 {{ config(
     materialized='table',
-    schema='SEOHA_SILVER_DATA'
+    schema='SILVER_DATA'
 ) }}
 
 WITH bronze_data AS (

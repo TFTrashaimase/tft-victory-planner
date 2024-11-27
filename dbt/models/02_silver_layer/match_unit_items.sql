@@ -1,7 +1,7 @@
 {{ config(
     materialized='incremental',
     unique_key='id',
-    schema='TFT_SILVER_DATA'
+    schema='SILVER_DATA'
 ) }}
 
 WITH bronze_data AS (

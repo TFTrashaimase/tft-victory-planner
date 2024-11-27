@@ -6,7 +6,7 @@ dbt_snowflake_profile:
       password: "{{ env_var('AIRFLOW_VAR_SNOWFLAKE_ACCOUNT_PW') }}"
       role: "{{ env_var('AIRFLOW_VAR_SNOWFLAKE_DBT_ROLE') }}"
       threads: 1
-      schema: EHDGML
+      schema: TFT
       type: snowflake
       user: "{{ env_var('AIRFLOW_VAR_SNOWFLAKE_ACCOUNT_NAME') }}"
       warehouse: "{{ env_var('AIRFLOW_VAR_SNOWFLAKE_WAREHOUSE') }}"
