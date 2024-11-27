@@ -153,10 +153,10 @@ with DAG(
         provide_context=True,
     )
 
-    trigger_snowflake_dag = TriggerDagRunOperator(
-        task_id='trigger_snowflake_dag',
-        trigger_dag_id='snowflake_load_dag',  # Snowflake로 적재되는 DAG 이름
-        conf={},
-    )
+    #trigger_snowflake_dag = TriggerDagRunOperator(
+    #    task_id='trigger_snowflake_dag',
+    #    trigger_dag_id='snowflake_load_dag',  # Snowflake로 적재되는 DAG 이름
+    #    conf={},
+    #)
  
-    fetch_champions_data_task >> transform_to_parquet_task >> save_to_s3_task >> trigger_snowflake_dag
+    fetch_champions_data_task >> transform_to_parquet_task >> save_to_s3_task #>> trigger_snowflake_dag

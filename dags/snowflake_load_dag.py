@@ -67,4 +67,4 @@ with DAG(
     )
 
     # 작업 순서 정의
-    load_s3_to_snowflake >> stage_data_to_snowflake >> copy_into_snowflake >> clean_stage_data햣
+    load_s3_to_snowflake >> stage_data_to_snowflake >> copy_into_snowflake >> clean_stage_data
