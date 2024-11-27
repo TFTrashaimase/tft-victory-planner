@@ -1,6 +1,6 @@
 {{ config(
     materialized='table',
-    schema='DONGHEE_SILVER_DATA'
+    schema='DONGHEE_DONGHEE_SILVER_DATA'
 ) }}
 
 WITH bronze_tft_champion_data AS (
