@@ -1,2 +1,2 @@
 SELECT *
-FROM beomjoon.temp -- raw data 등 브론즈 레이어 테이블로 수정예정입니당
+FROM TFT_RAW_DATA.raw_champion_meta

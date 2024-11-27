@@ -4,7 +4,7 @@
 ) }}
 
 WITH bronze_data AS (
-    SELECT * FROM {{ ref('raw_data_src') }}
+    SELECT DISTINCT * FROM {{ ref('raw_data_src') }}
 )
 SELECT
     -- JSON 데이터에서 추출

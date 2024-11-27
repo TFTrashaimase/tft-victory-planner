@@ -5,7 +5,7 @@
 ) }}
 
 WITH bronze_data AS (
-    SELECT *
+    SELECT DISTINCT * 
     FROM {{ ref('raw_data_src') }}
 ),
 flattened_participants AS (
@@ -18,7 +18,7 @@ flattened_participants AS (
         u.value:name::STRING AS unit_name,
         CAST(u.value:rarity::INTEGER AS NUMBER) AS rarity,
         CAST(u.value:tier::INTEGER AS NUMBER) AS unit_tier,
-        TO_TIMESTAMP(CONCAT(TO_CHAR(CURRENT_DATE, 'YYYY-MM-DD'), ' 00:00:00')) AS created_at
+        CURRENT_TIMESTAMP() AS created_at
     FROM
         bronze_data,
         LATERAL FLATTEN(INPUT => json_data:info:participants) p,

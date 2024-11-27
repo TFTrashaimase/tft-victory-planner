@@ -6,4 +6,4 @@
 SELECT
     *
 FROM
-    EHDGML_RAW_DATA.RAW_DATA
+    TFT_RAW_DATA.raw_champion_meta

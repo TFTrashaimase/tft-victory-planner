@@ -1,6 +1,6 @@
 {{ config(
     materialized='table',
-    schema='TFT_SILVER_DATA'
+    schema='SILVER_DATA'
 ) }}
 
 WITH bronze_tft_champion_data AS (
@@ -8,7 +8,7 @@ WITH bronze_tft_champion_data AS (
 ),
 flattened_data AS (
     SELECT
-        f1.value:id AS id,
+        SUBSTRING(f1.value:id::string, 1, LENGTH(f1.value:id::string) - 2) AS id,
         f1.value:name::string AS name,
         f1.value:tier::INTEGER AS cost,
         CURRENT_TIMESTAMP() AS created_at
