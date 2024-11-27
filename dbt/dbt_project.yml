@@ -21,7 +21,7 @@ models:
       +materialized: ephemeral # 임시테이블
     02_silver_layer:
       +materialized: table # 테이블
-      +schema: SILVER_DATA
+      +schema: DONGHEE_SILVER_DATA
     03_gold_layer:
       +materialized: table
-      +schema: GOLD_DATA
+      +schema: DONGHEE_GOLD_DATA
