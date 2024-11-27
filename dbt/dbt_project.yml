@@ -1,7 +1,7 @@
-name: 'test_snowflake'
-version: '1.0.0'
+name: 'dbt_snowflake_name'
+version: '1.0.1'
 
-profile: 'test_snowflake'
+profile: 'dbt_snowflake_profile'
 
 model-paths: ["models"]
 analysis-paths: ["analyses"]
@@ -16,9 +16,9 @@ clean-targets:
   - "dbt_packages"
 
 models:
-  test_snowflake:
+  dbt_snowflake:
     01_bronze_layer:
-      +materialized: ephemeral # 임시테이블
+
     02_silver_layer:
-      +materialized: table # 테이블
-      +schema: SILVER_DATA
+
+    03_gold_layer:

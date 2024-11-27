@@ -1,6 +1,7 @@
 {{ config(
     materialized='incremental',
-    unique_key='id'
+    unique_key='id',
+    schema='SILVER_DATA'
 ) }}
 
 WITH bronze_data AS (

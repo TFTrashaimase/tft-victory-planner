@@ -1,13 +1,13 @@
-test_snowflake:
+dbt_snowflake_profile:
   outputs:
     dev:
-      account: uiqmasv-qub95347
-      database: TFTPROJECT_TEAM2
-      password: Dnflskfk135!
-      role: ACCOUNTADMIN
+      account: "{{ env_var('AIRFLOW_VAR_SNOWFLAKE_ACCOUNT_ID') }}"
+      database: "{{ env_var('AIRFLOW_VAR_SNOWFLAKE_DBT_DATABASE') }}"
+      password: "{{ env_var('AIRFLOW_VAR_SNOWFLAKE_ACCOUNT_PW') }}"
+      role: "{{ env_var('AIRFLOW_VAR_SNOWFLAKE_DBT_ROLE') }}"
       threads: 1
-      schema: DONGHEE
+      schema: EHDGML
       type: snowflake
-      user: EHDGML7755
-      warehouse: COMPUTE_WH
+      user: "{{ env_var('AIRFLOW_VAR_SNOWFLAKE_ACCOUNT_NAME') }}"
+      warehouse: "{{ env_var('AIRFLOW_VAR_SNOWFLAKE_WAREHOUSE') }}"
   target: dev
