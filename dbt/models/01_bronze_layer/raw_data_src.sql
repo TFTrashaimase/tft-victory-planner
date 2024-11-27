@@ -1,4 +1,9 @@
+{{  config(
+    materialized = 'ephemeral',
+    schema = 'RAW_DATA'
+)}}
+
 SELECT
     *
 FROM
-    test
+    EHDGML_RAW_DATA.RAW_DATA
