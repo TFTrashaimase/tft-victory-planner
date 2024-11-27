@@ -1,6 +1,5 @@
 from airflow import DAG
 from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
-from airflow.providers.amazon.aws.transfers.s3_to_snowflake import S3ToSnowflakeOperator
 from airflow.models import Variable
 from datetime import datetime, timedelta
 
@@ -11,6 +10,10 @@ SNOWFLAKE_DATABASE = Variable.get('SNOWFLAKE_DATABASE', default_var=None)
 SNOWFLAKE_SCHEMA = Variable.get('SNOWFLAKE_SCHEMA', default_var=None)
 SNOWFLAKE_STAGE = Variable.get('SNOWFLAKE_STAGE', default_var=None)
 BUCKET_NAME = Variable.get("BUCKET_NAME", default_var=None)
+AWS_ACCESS_KEY = Variable.get("AWS_ACCESS_KEY", default_var=None)
+AWS_SECRET_KEY = Variable.get("AWS_SECRET_KEY", default_var=None)
+
+
 
 # DAG 기본 설정
 default_args = {
@@ -27,15 +30,17 @@ with DAG(
     description="DAG to load Parquet files from S3 to Snowflake, process, and clean stage",
 ) as snowflake_load_dag:
 
-    # 1. S3 -> Snowflake로 데이터 적재
-    load_s3_to_snowflake = S3ToSnowflakeOperator(
-        task_id='load_s3_to_snowflake',
+    # 1. Snowflake 스테이지에 데이터 적재
+    load_data_to_stage = SnowflakeOperator(
+        task_id='load_data_to_stage',
+        sql=f"""
+            COPY INTO @{SNOWFLAKE_STAGE}/
+            FROM 's3://{BUCKET_NAME}/{{{{ ds }}}}/'
+            CREDENTIALS = (AWS_KEY_ID = '{{{{ var.value.AWS_ACCESS_KEY }}}}' AWS_SECRET_KEY = '{{{{ var.value.AWS_SECRET_KEY }}}}')
+            FILE_FORMAT = (TYPE = 'PARQUET');
+        """,
         snowflake_conn_id=SNOWFLAKE_CONN_ID,
-        s3_bucket=BUCKET_NAME,
-        s3_keys=["{{ ds }}/*.parquet"],  # 매일 적재를 통해 생성되는 '날짜 형식의 S3 폴더'로부터 parquet 파일만 가져오기
-        snowflake_schema=SNOWFLAKE_SCHEMA,
-        snowflake_database=SNOWFLAKE_DATABASE,
-        file_format='parquet', 
+        autocommit=True,
     )
 
     # 2. 스테이지 파일 확인
@@ -67,4 +72,5 @@ with DAG(
     )
 
     # 작업 순서 정의
-    load_s3_to_snowflake >> stage_data_to_snowflake >> copy_into_snowflake >> clean_stage_data
+    load_data_to_stage >> stage_data_to_snowflake >> copy_into_snowflake >> clean_stage_data
+

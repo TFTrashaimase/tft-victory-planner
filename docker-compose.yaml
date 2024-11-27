@@ -91,6 +91,9 @@ services:
   airflow-webserver:
     <<: *airflow-common
     command: webserver
+    environment:
+      - AIRFLOW_HOME=/opt/airflow
+      - AIRFLOW_CONN_CONN_SNOWFLAKE=snowflake://${SNOWFLAKE_USER}:${SNOWFLAKE_PASSWORD}@${SNOWFLAKE_ACCOUNT}/${SNOWFLAKE_DATABASE}/${SNOWFLAKE_SCHEMA}?warehouse=${SNOWFLAKE_WAREHOUSE}&role=${SNOWFLAKE_ROLE}
     ports:
       - "8080:8080"
     healthcheck:
