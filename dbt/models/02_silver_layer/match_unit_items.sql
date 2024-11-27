@@ -5,8 +5,10 @@
 ) }}
 
 WITH bronze_data AS (
-    SELECT DISTINCT * 
-    FROM {{ ref('raw_data_src') }}
+    SELECT DISTINCT
+        * 
+    FROM
+        {{ ref('raw_data_src') }}
 ),
 flattened_participants AS (
     SELECT
