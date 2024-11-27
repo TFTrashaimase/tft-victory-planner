@@ -1,3 +1,4 @@
+
 # Use the official Airflow image as the base
 FROM apache/airflow:2.9.1
 
@@ -15,7 +16,7 @@ ENV _PIP_ADDITIONAL_REQUIREMENTS=${_PIP_ADDITIONAL_REQUIREMENTS:-pandas}
 
 # Install any additional dependencies if required
 # RUN pip install pandas
-USER root
+# USER root
 
 # Set airflow user password
 # RUN echo "airflow:airflow" | chpasswd
@@ -29,6 +30,10 @@ USER root
 # Set the command for the scheduler service (overrides the default entrypoint)
 # CMD ["bash", "-c", "/opt/airflow/mysettings/setup_vim.sh && airflow scheduler"]
 
+# dbt위한 git 설치
+USER root
+RUN apt-get update && apt-get install -y git && apt-get clean
+
 # airflow 유저로 복귀
 USER airflow
 
@@ -40,4 +45,3 @@ EXPOSE 8974
 
 # Optionally add your healthcheck command (this will be part of the docker-compose config)
 HEALTHCHECK CMD curl --fail http://localhost:8974/health || exit 1
-

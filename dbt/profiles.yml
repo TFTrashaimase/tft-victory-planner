@@ -1,0 +1,13 @@
+dbt_snowflake_profile:
+  outputs:
+    dev:
+      account: "{{ env_var('AIRFLOW_VAR_SNOWFLAKE_ACCOUNT_ID') }}"
+      database: "{{ env_var('AIRFLOW_VAR_SNOWFLAKE_DBT_DATABASE') }}"
+      password: "{{ env_var('AIRFLOW_VAR_SNOWFLAKE_ACCOUNT_PW') }}"
+      role: "{{ env_var('AIRFLOW_VAR_SNOWFLAKE_DBT_ROLE') }}"
+      threads: 1
+      schema: TFT
+      type: snowflake
+      user: "{{ env_var('AIRFLOW_VAR_SNOWFLAKE_ACCOUNT_NAME') }}"
+      warehouse: "{{ env_var('AIRFLOW_VAR_SNOWFLAKE_WAREHOUSE') }}"
+  target: dev

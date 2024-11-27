@@ -22,5 +22,20 @@ oauth2client
 # sqlalchemy
 sqlalchemy
 
+# dbt-core
+dbt-core
+
 # dbt-snowflake
 dbt-snowflake==1.7.1
+
+# boto3
+boto3
+
+# pyarrow
+pyarrow
+
+# pandas
+pandas
+
+# botocore
+botocore==1.35.69
