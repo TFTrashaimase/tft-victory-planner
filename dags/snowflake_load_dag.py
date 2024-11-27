@@ -1,14 +1,11 @@
 from airflow import DAG
 from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
 from airflow.models import Variable
-
-# from airflow.hooks.base import BaseHook
 from datetime import datetime, timedelta
 
 # 환경 변수 가져오기
 # SNOWFLAKE_CONN_ID = Variable.get("SNOWFLAKE_CONN_ID", default_var="snowflake_default")
 SNOWFLAKE_WAREHOUSE = Variable.get("SNOWFLAKE_WAREHOUSE", default_var=None)
-print("######", SNOWFLAKE_WAREHOUSE)
 SNOWFLAKE_DATABASE = Variable.get("SNOWFLAKE_DATABASE", default_var=None)
 SNOWFLAKE_SCHEMA = Variable.get("SNOWFLAKE_SCHEMA", default_var=None)
 SNOWFLAKE_STAGE = Variable.get("SNOWFLAKE_STAGE", default_var=None)
@@ -21,8 +18,8 @@ AWS_SECRET_KEY = Variable.get("AWS_SECRET_KEY", default_var=None)
 
 # DAG 기본 설정
 default_args = {
-    # "retries": 1,
-    # "retry_delay": timedelta(minutes=5),
+    "retries": 1,
+    "retry_delay": timedelta(minutes=5),
     "start_date": datetime(2024, 1, 1),
 }
 
