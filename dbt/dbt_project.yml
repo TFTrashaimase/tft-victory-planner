@@ -18,10 +18,5 @@ clean-targets:
 models:
   dbt_snowflake:
     01_bronze_layer:
-      +materialized: ephemeral # 임시테이블
     02_silver_layer:
-      +materialized: table # 테이블
-      +schema: DONGHEE_SILVER_DATA
     03_gold_layer:
-      +materialized: table
-      +schema: DONGHEE_GOLD_DATA
