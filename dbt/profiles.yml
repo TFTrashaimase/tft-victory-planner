@@ -6,7 +6,7 @@ test_snowflake:
       password: Dnflskfk135!
       role: ACCOUNTADMIN
       threads: 1
-      schema: TFT
+      schema: DONGHEE
       type: snowflake
       user: EHDGML7755
       warehouse: COMPUTE_WH

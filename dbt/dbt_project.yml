@@ -17,5 +17,8 @@ clean-targets:
 
 models:
   test_snowflake:
-    example:
-      +materialized: view
+    01_bronze_layer:
+      +materialized: ephemeral # 임시테이블
+    02_silver_layer:
+      +materialized: table # 테이블
+      +schema: SILVER_DATA
