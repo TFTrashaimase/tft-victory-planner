@@ -21,6 +21,6 @@ SELECT
     t.value:tier_current::INTEGER AS trait_tier_current,
     t.value:tier_total::INTEGER AS trait_tier_total
 FROM
-   bronze_data,
-   LATERAL FLATTEN(INPUT => json_data:info:participants) p,
-   LATERAL FLATTEN(INPUT => p.value:traits) t
+    bronze_data,
+    LATERAL FLATTEN(INPUT => json_data:info:participants) p,
+    LATERAL FLATTEN(INPUT => p.value:traits) t

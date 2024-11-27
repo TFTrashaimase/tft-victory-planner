@@ -32,6 +32,12 @@ x-airflow-common:
     AIRFLOW_VAR_SNOWFLAKE_SCHEMA: ${SNOWFLAKE_SCHEMA}
     AIRFLOW_VAR_SNOWFLAKE_STAGE: ${SNOWFLAKE_STAGE}
     AIRFLOW_VAR_SNOWFLAKE_ROLE: ${SNOWFLAKE_ROLE}
+    AIRFLOW_VAR_SNOWFLAKE_ACCOUNT_ID: ${SNOWFLAKE_ACCOUNT_ID}
+    AIRFLOW_VAR_SNOWFLAKE_ACCOUNT_PW: ${SNOWFLAKE_ACCOUNT_PW}
+    AIRFLOW_VAR_SNOWFLAKE_ACCOUNT_NAME: ${SNOWFLAKE_ACCOUNT_NAME}
+    AIRFLOW_VAR_SNOWFLAKE_DBT_DATABASE: ${SNOWFLAKE_DBT_DATABASE}
+    AIRFLOW_VAR_SNOWFLAKE_DBT_SCHEMA: ${SNOWFLAKE_DBT_SCHEMA}
+    AIRFLOW_VAR_SNOWFLAKE_DBT_ROLE: ${SNOWFLAKE_DBT_ROLE}
     # yamllint disable rule:line-length
     # Use simple http server on scheduler for health checks
     # See https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/logging-monitoring/check-health.html#scheduler-health-check-server
