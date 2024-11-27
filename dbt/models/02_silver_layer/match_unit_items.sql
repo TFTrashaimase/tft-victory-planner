@@ -1,0 +1,28 @@
+{{ config(
+    materialized='incremental',
+    unique_key='id',
+    schema='TFT_SILVER_DATA'
+) }}
+
+WITH bronze_data AS (
+    SELECT *
+    FROM {{ ref('raw_data_src') }}
+),
+flattened_participants AS (
+    SELECT
+        id_item.NEXTVAL AS id,
+        json_data:metadata:match_id::STRING AS match_id,
+        p.value:puuid::STRING AS puuid,
+        u.value:character_id::STRING AS character_id,
+        ARRAY_TO_STRING(u.value:itemNames, ', ') AS item_name, -- 배열을 문자열로 변환
+        u.value:name::STRING AS unit_name,
+        CAST(u.value:rarity::INTEGER AS NUMBER) AS rarity,
+        CAST(u.value:tier::INTEGER AS NUMBER) AS unit_tier,
+        TO_TIMESTAMP(CONCAT(TO_CHAR(CURRENT_DATE, 'YYYY-MM-DD'), ' 00:00:00')) AS created_at
+    FROM
+        bronze_data,
+        LATERAL FLATTEN(INPUT => json_data:info:participants) p,
+        LATERAL FLATTEN(INPUT => p.value:units) u
+)
+SELECT *
+FROM flattened_participants

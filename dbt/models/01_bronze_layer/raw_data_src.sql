@@ -1,6 +1,6 @@
 {{  config(
     materialized = 'ephemeral',
-    schema = 'RAW_DATA'
+    schema = 'TFT_RAW_DATA'
 )}}
 
 SELECT

@@ -1,7 +1,7 @@
 {{ config(
     materialized='incremental',
     unique_key='id',
-    schema='SILVER_DATA'
+    schema='TFT_SILVER_DATA'
 ) }}
 
 WITH bronze_data AS (
@@ -22,6 +22,6 @@ SELECT
     t.value:tier_total::INTEGER AS trait_tier_total,
     TO_TIMESTAMP(CONCAT(TO_CHAR(CURRENT_DATE, 'YYYY-MM-DD'), ' 00:00:00')) AS created_at
 FROM
-   bronze_data,
-   LATERAL FLATTEN(INPUT => json_data:info:participants) p,
-   LATERAL FLATTEN(INPUT => p.value:traits) t
+    bronze_data,
+    LATERAL FLATTEN(INPUT => json_data:info:participants) p,
+    LATERAL FLATTEN(INPUT => p.value:traits) t
