@@ -477,7 +477,7 @@ with DAG(
         for dag_id in dag_ids_to_trigger:
             conf = {
                     "s3_bucket_folder": "{{ task_instance.xcom_pull(task_ids='load_json_to_s3') }}",
-                    "triggered_by": "trigger_dynamic_dags", 
+                    "triggered_by": "TFT_Riot_API_Dag", 
                     "triggered_dag": dag_id,
                     "execution_date": "{{ execution_date.isoformat() }}",
                 }
