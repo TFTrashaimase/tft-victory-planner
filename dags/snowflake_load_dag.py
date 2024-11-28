@@ -43,7 +43,7 @@ with DAG(
 
     # # 2. 스테이지에 적재가 잘 되었는지 확인
     is_stage_data_ready = SnowflakeOperator(
-        task_id="is_stage_ready",
+        task_id="is_stage_data_ready",
         snowflake_conn_id=SNOWFLAKE_CONN_ID,
         sql=f"LIST @{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE};",
         autocommit=True,
@@ -51,7 +51,7 @@ with DAG(
 
     # # 3 - 1. 스테이지에서 BRONZE_TFT_CHAMPION_INFO 테이블로 데이터 복사
     copy_into_bronze_champion_info = SnowflakeOperator(
-        task_id="copy_into_snowflake",
+        task_id="copy_into_bronze_champion_info",
         snowflake_conn_id=SNOWFLAKE_CONN_ID,
         sql=f"""
             COPY INTO {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.BRONZE_TFT_CHAMPION_INFO
@@ -70,7 +70,7 @@ with DAG(
     
         # # 3 - 2. 스테이지에서 BRONZE_TFT_MATCH_INFO 테이블로 데이터 복사
     copy_into_bronze_match_info = SnowflakeOperator(
-        task_id="copy_into_snowflake",
+        task_id="copy_into_bronze_match_info",
         snowflake_conn_id=SNOWFLAKE_CONN_ID,
         sql=f"""
             COPY INTO {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.BRONZE_TFT_MATCH_INFO
