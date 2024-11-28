@@ -4,7 +4,7 @@ from airflow.models import Variable
 from datetime import datetime, timedelta
 
 # 환경 변수 가져오기
-SNOWFLAKE_CONN_ID = Variable.get("SNOWFLAKE_CONN_ID", default_var="snowflake_default")
+#SNOWFLAKE_CONN_ID = Variable.get("SNOWFLAKE_CONN_ID", default_var="snowflake_default") 
 SNOWFLAKE_WAREHOUSE = Variable.get("SNOWFLAKE_WAREHOUSE", default_var=None)
 SNOWFLAKE_DATABASE = Variable.get("SNOWFLAKE_DATABASE", default_var=None)
 SNOWFLAKE_SCHEMA = Variable.get("SNOWFLAKE_SCHEMA", default_var=None)
@@ -14,6 +14,8 @@ BUCKET_NAME = Variable.get("BUCKET_NAME", default_var=None)
 AWS_ACCESS_KEY = Variable.get("AWS_ACCESS_KEY", default_var=None)
 AWS_SECRET_KEY = Variable.get("AWS_SECRET_KEY", default_var=None)
 
+# 임시 Snowflake_conn_id
+SNOWFLAKE_CONN_ID="conn_snowflake_2"
 
 # DAG 기본 설정
 default_args = {
