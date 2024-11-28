@@ -18,6 +18,26 @@ x-airflow-common:
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'true'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+    AIRFLOW_VAR_BUCKET_NAME: ${BUCKET_NAME}
+    AIRFLOW_VAR_BUCKET_ARN: ${BUCKET_ARN}
+    AIRFLOW_VAR_BUCKET_REGION: ${BUCKET_REGION}
+    AIRFLOW_VAR_BASE_URL: ${BASE_URL}
+    AIRFLOW_VAR_QUEUE_TYPE: ${QUEUE_TYPE}
+    AIRFLOW_VAR_API_KEY: ${API_KEY}
+    AIRFLOW_VAR_AWS_ACCESS_KEY: ${AWS_ACCESS_KEY}
+    AIRFLOW_VAR_AWS_SECRET_KEY: ${AWS_SECRET_KEY}
+    AIRFLOW_VAR_SNOWFLAKE_CONN_ID: ${SNOWFLAKE_CONN_ID}
+    AIRFLOW_VAR_SNOWFLAKE_WAREHOUSE: ${SNOWFLAKE_WAREHOUSE}
+    AIRFLOW_VAR_SNOWFLAKE_DATABASE: ${SNOWFLAKE_DATABASE}
+    AIRFLOW_VAR_SNOWFLAKE_SCHEMA: ${SNOWFLAKE_SCHEMA}
+    AIRFLOW_VAR_SNOWFLAKE_STAGE: ${SNOWFLAKE_STAGE}
+    AIRFLOW_VAR_SNOWFLAKE_ROLE: ${SNOWFLAKE_ROLE}
+    AIRFLOW_VAR_SNOWFLAKE_ACCOUNT_ID: ${SNOWFLAKE_ACCOUNT_ID}
+    AIRFLOW_VAR_SNOWFLAKE_ACCOUNT_PW: ${SNOWFLAKE_ACCOUNT_PW}
+    AIRFLOW_VAR_SNOWFLAKE_ACCOUNT_NAME: ${SNOWFLAKE_ACCOUNT_NAME}
+    AIRFLOW_VAR_SNOWFLAKE_DBT_DATABASE: ${SNOWFLAKE_DBT_DATABASE}
+    AIRFLOW_VAR_SNOWFLAKE_DBT_SCHEMA: ${SNOWFLAKE_DBT_SCHEMA}
+    AIRFLOW_VAR_SNOWFLAKE_DBT_ROLE: ${SNOWFLAKE_DBT_ROLE}
     # yamllint disable rule:line-length
     # Use simple http server on scheduler for health checks
     # See https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/logging-monitoring/check-health.html#scheduler-health-check-server
@@ -35,6 +55,7 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
     - ${AIRFLOW_PROJ_DIR:-.}/mysettings:/opt/airflow/mysettings
+    - ${AIRFLOW_PROJ_DIR:-.}/dbt:/opt/airflow/dbt
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
@@ -42,8 +63,6 @@ x-airflow-common:
       condition: service_healthy
     postgres:
       condition: service_healthy
-#  command: >
-#     bash -c "pip install -r /opt/airflow/mysettings/requirements.txt && airflow scheduler"
 
 services:
   postgres:
@@ -97,8 +116,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: >
-      bash -c "/opt/airflow/mysettings/setup_vim.sh && airflow scheduler"
+    command: ["scheduler"]
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
       interval: 30s
