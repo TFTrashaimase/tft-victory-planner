@@ -1,4 +1,5 @@
 from airflow import DAG
+from airflow.operators.python import PythonOperator
 from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
 from airflow.models import Variable
 from datetime import datetime, timedelta
@@ -12,6 +13,7 @@ BUCKET_NAME = Variable.get("BUCKET_NAME", default_var=None)
 AWS_ACCESS_KEY = Variable.get("AWS_ACCESS_KEY", default_var=None)
 AWS_SECRET_KEY = Variable.get("AWS_SECRET_KEY", default_var=None)
 
+
 # DAG 기본 설정
 default_args = {
     "retries": 1,
@@ -19,22 +21,29 @@ default_args = {
     "start_date": datetime(2024, 1, 1),
 }
 
+
 with DAG(
-    dag_id="snowflake_load_dag",
+    dag_id="match_info_snowflake_load_dag",
     default_args=default_args,
     schedule_interval=None,  # Trigger되어 실행됨
     catchup=False,
     description="DAG to load Parquet files from S3 to Snowflaktere, process, and clean stage",
 ) as snowflake_load_dag:
 
-    # 1. Snowflake 스테이지에 데이터 적재
+
+    # # 1. Snowflake 스테이지에 데이터 적재
     load_data_to_stage = SnowflakeOperator(
         task_id="load_data_to_stage",
         snowflake_conn_id="snowflake_conn",
-        sql=f"""CREATE OR REPLACE STAGE {SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}
-            URL='s3://{BUCKET_NAME}/{{{{ ds }}}}/match_infos/'
-            CREDENTIALS = (AWS_KEY_ID = '{{{{ var.value.AWS_ACCESS_KEY }}}}' AWS_SECRET_KEY = '{{{{ var.value.AWS_SECRET_KEY }}}}')
-            FILE_FORMAT=(TYPE='PARQUET')""",
+        sql=f"""
+    CREATE OR REPLACE STAGE {SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}
+    URL='s3://{BUCKET_NAME}/{{ dag_run.conf.get('execution_date') }}'
+    CREDENTIALS = (
+        AWS_KEY_ID = '{{{{ var.value.AWS_ACCESS_KEY }}}}'
+        AWS_SECRET_KEY = '{{{{ var.value.AWS_SECRET_KEY }}}}'
+    )
+    FILE_FORMAT=(TYPE='PARQUET')
+    """,
         autocommit=True,
     )
 
@@ -46,26 +55,7 @@ with DAG(
         autocommit=True,
     )
 
-    # # 3 - 1. 스테이지에서 BRONZE_TFT_CHAMPION_INFO 테이블로 데이터 복사
-    copy_into_bronze_champion_info = SnowflakeOperator(
-        task_id="copy_into_bronze_champion_info",
-        snowflake_conn_id="snowflake_conn",
-        sql=f"""
-            COPY INTO {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.BRONZE_TFT_CHAMPION_INFO
-            FROM (
-                SELECT
-                's3://{BUCKET_NAME}/{{{{ ds }}}}' AS source,
-                CURRENT_TIMESTAMP() AS ingestion_date,
-                $1 data
-                FROM @{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}
-            )
-            FILE_FORMAT = (TYPE = 'PARQUET')
-            PATTERN = '^(?!.*match_infos/).*\.parquet';
-        """,
-        autocommit=True,
-    )
-    
-        # # 3 - 2. 스테이지에서 BRONZE_TFT_MATCH_INFO 테이블로 데이터 복사
+    # # 3. 스테이지에서 BRONZE_TFT_MATCH_INFO 테이블로 데이터 복사
     copy_into_bronze_match_info = SnowflakeOperator(
         task_id="copy_into_bronze_match_info",
         snowflake_conn_id="snowflake_conn",
@@ -73,7 +63,7 @@ with DAG(
             COPY INTO {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.BRONZE_TFT_MATCH_INFO
             FROM (
                 SELECT
-                's3://{BUCKET_NAME}/{{{{ ds }}}}' AS source,
+                's3://{BUCKET_NAME}/{{ dag_run.conf.get('execution_date') }}' AS source,
                 CURRENT_TIMESTAMP() AS ingestion_date,
                 $1 data
                 FROM @{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}
@@ -96,6 +86,6 @@ with DAG(
     (
         load_data_to_stage
         >> is_stage_data_ready
-        >> [copy_into_bronze_champion_info, copy_into_bronze_match_info]
+        >> copy_into_bronze_match_info
         >> clean_stage_data
     )

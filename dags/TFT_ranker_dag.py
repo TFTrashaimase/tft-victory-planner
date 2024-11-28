@@ -374,7 +374,7 @@ def matching_info_to_s3(**kwargs):
             response.raise_for_status()
             data = response.json()
 
-            file_name = exe_string + '/match_infos/' + user + '_' + match + '_' + exe_string + '.parquet'
+            file_name = exe_string + '/match_infos/' + user + '_' + match + '.parquet'
             try:
                 # json을 PyArrow로 변환 후 S3에 업로드
                 data = normalize_json(process_nested_json(data))
@@ -471,7 +471,7 @@ with DAG(
 
     trigger_snowflake_dag = TriggerDagRunOperator(
         task_id='trigger_snowflake_dag',
-        trigger_dag_id='snowflake_load_dag',  # Snowflake로 적재되는 DAG 이름
+        trigger_dag_id='match_info_snowflake_load_dag',  # Snowflake로 적재되는 DAG 이름
         conf={},
     )
 
