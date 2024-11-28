@@ -11,7 +11,7 @@ WITH bronze_tft_champion_data AS (
 ),
 flattened_data AS (
     SELECT
-        SUBSTRING(f1.value:id::string, 1, LENGTH(f1.value:id::string) - 2) AS id,
+        SUBSTRING(f1.value:id::string, 1, LENGTH(f1.value:id::string)) AS id,
         f1.value:name::string AS name,
         f1.value:tier::INTEGER AS cost,
         CURRENT_TIMESTAMP() AS created_at
