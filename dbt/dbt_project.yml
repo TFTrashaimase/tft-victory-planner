@@ -16,7 +16,7 @@ clean-targets:
   - "dbt_packages"
 
 models:
-  dbt_snowflake:
+  dbt_snowflake_name:
     01_bronze_layer:
     02_silver_layer:
     03_gold_layer:
