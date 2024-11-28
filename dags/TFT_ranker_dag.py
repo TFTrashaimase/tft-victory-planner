@@ -30,7 +30,7 @@ s3 = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY_ID, aws_secret_access_k
 tiers = ["DIAMOND", "EMERALD", "PLATINUM", "GOLD", "SILVER", "BRONZE"]
 divisions = ["I", "II", "III", "IV"]
 page = 1
-MATCHES_COUNT = 20  # 한 번에 가져올 매치 수, 원한다면 수정해서 작업. 
+MATCHES_COUNT = 1  # 한 번에 가져올 매치 수, 원한다면 수정해서 작업. 
 
 # Variables가 없다면 에러 발생
 if not API_KEY:
@@ -132,7 +132,7 @@ def get_master(**kwargs):
         response.raise_for_status()
         summoner_ids = response.json()["entries"]
         master_data = []
-        if len(summoner_ids) > 0:
+        if 10 >= len(summoner_ids) > 0:
             for master_info in summoner_ids:
                 time.sleep(2)
                 s_id = master_info["summonerId"]
@@ -161,7 +161,7 @@ def get_tier(**kwargs):
                 response.raise_for_status()
                 data = response.json()
 
-                if len(data) >= 100:
+                if len(data) >= 10:
                     logging.info(f"Fetched {len(data)} records for Tier={tier}, Divisiozn={division}")
                     return data
 
