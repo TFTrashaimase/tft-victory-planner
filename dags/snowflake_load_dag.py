@@ -3,18 +3,9 @@ from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
 from airflow.models import Variable
 from datetime import datetime, timedelta
 
-from airflow import settings
-from airflow.models import Connection
-import json
-
 # 환경 변수 가져오기
-SNOWFLAKE_CONN_ID = Variable.get("SNOWFLAKE_CONN_ID", default_var="snowflake_default") 
-SNOWFLAKE_ACCOUNT_ID = Variable.get("SNOWFLAKE_ACCOUNT_ID", default_var=None)
-SNOWFLAKE_WAREHOUSE = Variable.get("SNOWFLAKE_WAREHOUSE", default_var=None)
-SNOWFLAKE_ROLE = Variable.get("SNOWFLAKE_ROLE", default_var=None)
-SNOWFLAKE_ACCOUNT_NAME = Variable.get("SNOWFLAKE_ACCOUNT_NAME", default_var=None)
+SNOWFLAKE_CONN_ID = Variable.get("SNOWFLAKE_CONN_ID", default_var="snowflake_default")
 SNOWFLAKE_DATABASE = Variable.get("SNOWFLAKE_DATABASE", default_var=None)
-SNOWFLAKE_ACCOUNT_PW = Variable.get("SNOWFLAKE_ACCOUNT_PW", default_var=None)
 SNOWFLAKE_SCHEMA = Variable.get("SNOWFLAKE_SCHEMA", default_var=None)
 SNOWFLAKE_STAGE = Variable.get("SNOWFLAKE_STAGE", default_var=None)
 BUCKET_NAME = Variable.get("BUCKET_NAME", default_var=None)
