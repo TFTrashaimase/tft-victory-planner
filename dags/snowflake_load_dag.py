@@ -16,13 +16,13 @@ SNOWFLAKE_ACCOUNT_NAME = Variable.get("SNOWFLAKE_ACCOUNT_NAME", default_var=None
 SNOWFLAKE_DATABASE = Variable.get("SNOWFLAKE_DATABASE", default_var=None)
 SNOWFLAKE_ACCOUNT_PW = Variable.get("SNOWFLAKE_ACCOUNT_PW", default_var=None)
 SNOWFLAKE_SCHEMA = Variable.get("SNOWFLAKE_SCHEMA", default_var=None)
-# SNOWFLAKE_CONN_ID = Variable.get("SNOWFLAKE_CONN_ID", default_var="snowflake_default")
+SNOWFLAKE_CONN_ID = Variable.get("SNOWFLAKE_CONN_ID", default_var="snowflake_default")
 SNOWFLAKE_STAGE = Variable.get("SNOWFLAKE_STAGE", default_var=None)
 BUCKET_NAME = Variable.get("BUCKET_NAME", default_var=None)
 AWS_ACCESS_KEY = Variable.get("AWS_ACCESS_KEY", default_var=None)
 AWS_SECRET_KEY = Variable.get("AWS_SECRET_KEY", default_var=None)
 
-SNOWFLAKE_CONN_ID = "snowflake_default"
+# SNOWFLAKE_CONN_ID = "snowflake_default"
 
 # 임시 Snowflake_conn_id
 # SNOWFLAKE_CONN_ID="conn_snowflake_2"
@@ -50,7 +50,7 @@ def create_snowflake_connection():
     if not existing_connection:
         connection = Connection(
             conn_id=SNOWFLAKE_CONN_ID,
-            conn_type=SNOWFLAKE_CONN_ID,
+            conn_type="snowflake",
             login=SNOWFLAKE_ACCOUNT_NAME,
             password=SNOWFLAKE_ACCOUNT_PW,
             schema=SNOWFLAKE_SCHEMA,
