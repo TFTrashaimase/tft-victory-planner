@@ -19,6 +19,12 @@ apache-airflow-providers-mysql==5.7.0
 # apache-airflow[snowflake]
 apache-airflow[snowflake]==2.9.1
 
+# apache-airflow-providers-amazon 
+apache-airflow-providers-amazon==9.1.0
+
+# apache-airflow-providers-snowflake
+apache-airflow-providers-snowflake==5.8.1
+
 # oauth2client
 oauth2client
 
