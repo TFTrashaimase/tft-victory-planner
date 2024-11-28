@@ -36,12 +36,13 @@ with DAG(
     description="DAG to load Parquet files from S3 to Snowflaktere, process, and clean stage",
 ) as snowflake_load_dag:
 
+    # s3://tft-team2-rawdata/match_infos/{YYYY-MM-DD}/{puuid}_{match_id}.parquet
     # 1. Snowflake 스테이지에 데이터 적재
     load_data_to_stage = SnowflakeOperator(
         task_id="load_data_to_stage",
         snowflake_conn_id="snowflake_conn",
         sql=f"""CREATE OR REPLACE STAGE {SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}
-            URL='s3://{BUCKET_NAME}/{{{{ ds }}}}/match_infos/'
+            URL='s3://{BUCKET_NAME}/match_infos/{{ dag_run.conf.get('execution_date') }}/'
             CREDENTIALS = (AWS_KEY_ID = '{{{{ var.value.AWS_ACCESS_KEY }}}}' AWS_SECRET_KEY = '{{{{ var.value.AWS_SECRET_KEY }}}}')
             FILE_FORMAT=(TYPE='PARQUET')""",
         autocommit=True,
@@ -63,7 +64,7 @@ with DAG(
             COPY INTO {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.BRONZE_TFT_CHAMPION_INFO
             FROM (
                 SELECT
-                's3://{BUCKET_NAME}/{{{{ ds }}}}' AS source,
+                's3://{BUCKET_NAME}/match_infos/{{ dag_run.conf.get('execution_date') }}/' AS source,
                 CURRENT_TIMESTAMP() AS ingestion_date,
                 $1 data
                 FROM @{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}
@@ -82,7 +83,7 @@ with DAG(
             COPY INTO {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.BRONZE_TFT_MATCH_INFO
             FROM (
                 SELECT
-                's3://{BUCKET_NAME}/{{{{ ds }}}}' AS source,
+                's3://{BUCKET_NAME}/match_infos/{{ dag_run.conf.get('execution_date') }}/' AS source,
                 CURRENT_TIMESTAMP() AS ingestion_date,
                 $1 data
                 FROM @{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}
