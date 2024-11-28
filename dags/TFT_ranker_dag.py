@@ -82,7 +82,7 @@ def get_challenger(**kwargs):
         challenger_data = []
         if len(summoner_ids) > 0:
             for challenger_info in summoner_ids:
-                time.sleep(1)
+                time.sleep(2)
                 s_id = challenger_info["summonerId"]
 
                 challenger_data.append(get_entries_by_summoner(s_id))
@@ -108,6 +108,7 @@ def get_grandmaster(**kwargs):
         gmaster_data = []
         if len(summoner_ids) > 0:
             for gmaster_info in summoner_ids:
+                time.sleep(2)
                 s_id = gmaster_info["summonerId"]
 
                 gmaster_data.append(get_entries_by_summoner(s_id))
@@ -133,6 +134,7 @@ def get_master(**kwargs):
         master_data = []
         if len(summoner_ids) > 0:
             for master_info in summoner_ids:
+                time.sleep(2)
                 s_id = master_info["summonerId"]
 
                 master_data.append(get_entries_by_summoner(s_id))
@@ -152,6 +154,7 @@ def get_master(**kwargs):
 def get_tier(**kwargs):  
     for tier in tiers:
         for division in divisions:
+            time.sleep(2)
             url = f"{BASE_URL}/tft/league/v1/entries/{tier}/{division}?queue={QUEUE_TYPE}&page={page}"
             try:
                 response = requests.get(url, headers={"X-Riot-Token": API_KEY})
@@ -236,7 +239,7 @@ def get_matching_ids(puuid, **kwargs):
             how_many_api_call, remain_api_call = MATCHES_COUNT // 200, MATCHES_COUNT % 200
             full_return_data = []
             for cnt in range(how_many_api_call):
-                time.sleep(1)
+                time.sleep(2)
                 url = f"{BASE_URL}/tft/match/v1/matches/by-puuid/{puuid}/ids?start={cnt * 200}&count={MATCHES_COUNT}"
                 response = requests.get(url)
                 response.raise_for_status()
@@ -286,7 +289,7 @@ def process_matching_ids(**kwargs):
         for user in puuid_list:
             puuid = user['puuid']
             # puuid에 대해 matching ID를 가져옵니다
-            time.sleep(1)
+            time.sleep(2)
             matching_ids = get_matching_ids(puuid)
             full_matching_ids[exe_string + '_' + puuid + '_' + 'matching_id'] = matching_ids
             logging.info(f"Matching IDs for puuid {puuid}: {matching_ids}")
@@ -366,10 +369,9 @@ def matching_info_to_s3(**kwargs):
         matches = match_data[user]
 
         for match in matches:
-            time.sleep(1.5)
+            time.sleep(2)
             if match is None:
                 continue
-            time.sleep(0.5)
             match_api_url = f"https://asia.api.riotgames.com/tft/match/v1/matches/{match}"
             response = requests.get(match_api_url, headers={"X-Riot-Token": API_KEY})
             response.raise_for_status()
@@ -486,3 +488,5 @@ with DAG(
 
 # 태스크 의존성 설정
 [challenger_task, grandmaster_task, master_task, tier_task] >> process_puuid >> matching_id_task >> matching_info_to_s3_task >> trigger_group
+
+# 제가 짠건데 문제가 많아요
