@@ -11,7 +11,8 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 from airflow.models import Variable
-from airflow.operators.trigger_dagrun import TriggerDagRunOperator
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator  # 나중에 필요함
+from airflow.utils.task_group import TaskGroup  # 나중에 필요함
 
 # Variables 읽어오기 - .env 참고
 API_KEY = Variable.get("API_KEY", default_var=None)
@@ -348,6 +349,7 @@ def process_nested_json(data):
     else:
         return data
 
+# s3://tft-team2-rawdata/match_infos/{YYYY-MM-DD}/{puuid}_{match_id}.parquet
 # s3에 적재
 def matching_info_to_s3(**kwargs):
     exe_datetime = kwargs['execution_date']  # execution_date 기준으로 폴더 명을 나눔
@@ -358,14 +360,13 @@ def matching_info_to_s3(**kwargs):
         logging.info("No match data to process")
         return exe_string
 
-
+    # API 호출 제한 => 1초에 20번, 2분에 100번
     for user in match_data.keys():
         time.sleep(0.5)
         matches = match_data[user]
 
-        for cnt, match in enumerate(matches):
-            if cnt % 50 == 0 and cnt > 0:
-                time.sleep(60)
+        for match in matches:
+            time.sleep(1.5)
             if match is None:
                 continue
             time.sleep(0.5)
@@ -374,7 +375,8 @@ def matching_info_to_s3(**kwargs):
             response.raise_for_status()
             data = response.json()
 
-            file_name = exe_string + '/match_infos/' + user + '_' + match + '.parquet'
+            # s3://tft-team2-rawdata/match_infos/{YYYY-MM-DD}/{puuid}_{match_id}.parquet
+            file_name = 'tft-team2-rawdata/match_infos/' + exe_string + '/' + user + '_' + match + '.parquet'
             try:
                 # json을 PyArrow로 변환 후 S3에 업로드
                 data = normalize_json(process_nested_json(data))
@@ -394,7 +396,6 @@ def matching_info_to_s3(**kwargs):
                 logging.error(f"Failed to upload {file_name} to S3: {e}")
     
     return exe_string
-
 
 # DAG 기본 설정
 default_args = {
@@ -469,12 +470,19 @@ with DAG(
         dag=dag
     )
 
-    trigger_snowflake_dag = TriggerDagRunOperator(
-        task_id='trigger_snowflake_dag',
-        trigger_dag_id='match_info_snowflake_load_dag',  # Snowflake로 적재되는 DAG 이름
-        conf={},
-    )
+    # 트리거할 DAG ID 리스트
+    dag_ids_to_trigger = ['snowflake_load_dag']
+
+    with TaskGroup(group_id='trigger_snowflake_load_dags') as trigger_group:
+        for dag_id in dag_ids_to_trigger:
+            conf = {
+                    "s3_bucket_folder": "{{ task_instance.xcom_pull(task_ids='load_json_to_s3') }}",
+                    "triggered_by": "TFT_Riot_API_Dag", 
+                    "triggered_dag": dag_id,
+                    "execution_date": "{{ execution_date.isoformat() }}",
+                }
+            TriggerDagRunOperator(task_id=f'trigger_{dag_id}', trigger_dag_id=dag_id, conf=conf)
+
 
 # 태스크 의존성 설정
-
-[challenger_task, grandmaster_task, master_task, tier_task] >> process_puuid >> matching_id_task >> matching_info_to_s3_task >> trigger_snowflake_dag
+[challenger_task, grandmaster_task, master_task, tier_task] >> process_puuid >> matching_id_task >> matching_info_to_s3_task >> trigger_group

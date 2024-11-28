@@ -17,6 +17,7 @@ from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 
 logger = logging.getLogger(__name__)
 
+BUCKET_NAME = Variable.get("BUCKET_NAME", default_var=None)
 
 # 모든 값을 동일한 길이로 맞추는 함수
 # pyarrow를 이용해서 데이터를 테이블로 변환할 땐 동일한 길이로 맞춰야 하므로.
@@ -91,7 +92,11 @@ def save_to_s3(**kwargs):
 
     exe_datetime = kwargs['execution_date']
     exe_string = exe_datetime.strftime('%Y-%m-%d')
-    file_name = f"{exe_string}/champion_data_{exe_string}.parquet"
+    # s3://tft-team2-rawdata/metadatachampion/{YYYY-MM-DD}/champion_data.parquet
+    if not BUCKET_NAME:
+        logging.error("BUCKET_NAME is None. Should be selected.")
+        raise
+    file_name = f"metadatachampion/{kwargs['execution_date'].strftime('%Y-%m-%d')}/champion_data.parquet"
 
     aws_access_key = Variable.get("AWS_ACCESS_KEY")
     aws_secret_key = Variable.get("AWS_SECRET_KEY")
@@ -125,7 +130,8 @@ default_args = {
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
 }
-
+# match_info_snowflake_load_dag
+# champion_meta_snowflake_load_dag 
 with DAG(
     'tft_champion_data_ingestion',
     default_args=default_args,
@@ -155,8 +161,13 @@ with DAG(
 
     trigger_snowflake_dag = TriggerDagRunOperator(
         task_id='trigger_snowflake_dag',
-        trigger_dag_id='snowflake_load_dag',  # Snowflake로 적재되는 DAG 이름
-        conf={},
+        trigger_dag_id='champion_meta_snowflake_load_dag',  # Snowflake로 적재되는 DAG 이름
+        conf = {
+                    "s3_bucket_folder": "{{ task_instance.xcom_pull(task_ids='load_json_to_s3') }}",
+                    "triggered_by": "TFT_Riot_API_Dag", 
+                    "triggered_dag": 'champion_meta_snowflake_load_dag',
+                    "execution_date": "{{ execution_date.isoformat() }}",
+                },
     )
- 
+
     fetch_champions_data_task >> transform_to_parquet_task >> save_to_s3_task >> trigger_snowflake_dag
