@@ -20,7 +20,7 @@ default_args = {
 }
 
 with DAG(
-    dag_id="snowflake_load_dag",
+    dag_id="match_info_snowflake_load_dag",
     default_args=default_args,
     schedule_interval=None,  # Trigger되어 실행됨
     catchup=False,
