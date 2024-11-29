@@ -8,11 +8,11 @@ from datetime import datetime, timedelta
 SNOWFLAKE_CONN_ID = Variable.get("SNOWFLAKE_CONN_ID", default_var="snowflake_default")
 SNOWFLAKE_DATABASE = Variable.get("SNOWFLAKE_DATABASE", default_var=None)
 SNOWFLAKE_SCHEMA = Variable.get("SNOWFLAKE_SCHEMA", default_var=None) 
-SNOWFLAKE_STAGE = Variable.get("SNOWFLAKE_STAGE", default_var=None)
+SNOWFLAKE_STAGE = Variable.get("SNOWFLAKE_STAGE_MATCH", default_var=None)
 BUCKET_NAME = Variable.get("BUCKET_NAME", default_var=None)
 AWS_ACCESS_KEY = Variable.get("AWS_ACCESS_KEY", default_var=None)
 AWS_SECRET_KEY = Variable.get("AWS_SECRET_KEY", default_var=None)
-SNOW_FLAKE_MATCH_INFO_TABLE = Variable.get("SNOWFLAKE_MATCH_INFO_TABLE", default_var=None)
+SNOWFLAKE_MATCH_INFO_TABLE = Variable.get("SNOWFLAKE_MATCH_INFO_TABLE", default_var=None)
 
 
 # DAG 기본 설정
@@ -58,7 +58,7 @@ with DAG(
         task_id="create_bronze_match_info",
         snowflake_conn_id="snowflake_conn",
         sql=f"""
-            CREATE TABLE IF NOT EXISTS {SNOWFLAKE_SCHEMA}.{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_MATCH_INFO_TABLE} (
+            CREATE TABLE IF NOT EXISTS {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_MATCH_INFO_TABLE} (
                 source STRING,
                 ingestion_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 data VARIANT

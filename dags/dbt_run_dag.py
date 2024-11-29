@@ -46,7 +46,7 @@ def save_trigger_state(trigger_name, **kwargs):
 
 
 # Create the DAG with the specified schedule interval
-with DAG('dbt_run_dag', default_args=default_args, schedule_interval=timedelta(days=1), catchup=False, schedule="@once") as dag:
+with DAG('dbt_run_dag', default_args=default_args, schedule="@once", catchup=False) as dag:
 
     save_trigger_from_match_info = PythonOperator(
             task_id='save_trigger_from_match_info',
