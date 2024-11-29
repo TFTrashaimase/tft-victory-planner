@@ -13,9 +13,12 @@ from airflow.models import Variable
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.operators.python import PythonOperator
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
+from airflow.utils.task_group import TaskGroup
 
 logger = logging.getLogger(__name__)
 
+BUCKET_NAME = Variable.get("BUCKET_NAME", default_var=None)
 
 # 모든 값을 동일한 길이로 맞추는 함수
 # pyarrow를 이용해서 데이터를 테이블로 변환할 땐 동일한 길이로 맞춰야 하므로.
@@ -88,9 +91,13 @@ def save_to_s3(**kwargs):
     parquet_data = base64.b64decode(parquet_base64)
     parquet_buffer = BytesIO(parquet_data)
 
-    exe_datetime = kwargs['execution_date']
-    exe_string = exe_datetime.strftime('%Y-%m-%d')
-    file_name = f"{exe_string}/champion_data_{exe_string}.parquet"
+    # exe_datetime = kwargs['execution_date']
+    # exe_string = exe_datetime.strftime('%Y-%m-%d')
+    # s3://tft-team2-rawdata/metadatachampion/{YYYY-MM-DD}/champion_data.parquet
+    if not BUCKET_NAME:
+        logging.error("BUCKET_NAME is None. Should be selected.")
+        raise
+    file_name = f"metadatachampion/{kwargs['execution_date'].strftime('%Y-%m-%d')}/champion_data.parquet"
 
     aws_access_key = Variable.get("AWS_ACCESS_KEY")
     aws_secret_key = Variable.get("AWS_SECRET_KEY")
@@ -124,7 +131,8 @@ default_args = {
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
 }
-
+# match_info_snowflake_load_dag
+# champion_meta_snowflake_load_dag 
 with DAG(
     'tft_champion_data_ingestion',
     default_args=default_args,
@@ -152,4 +160,16 @@ with DAG(
         provide_context=True,
     )
 
-    fetch_champions_data_task >> transform_to_parquet_task >> save_to_s3_task
+    dag_ids_to_trigger = ['champion_meta_snowflake_load_dag']
+
+    with TaskGroup(group_id='trigger_snowflake_load_dags') as trigger_group:
+        for dag_id in dag_ids_to_trigger:
+            conf = {
+                    "s3_bucket_folder": "{{ task_instance.xcom_pull(task_ids='save_to_s3') }}",
+                    "triggered_by": "tft_champion_data_ingestion", 
+                    "triggered_dag": dag_id,
+                    "execution_date": "{{ execution_date.isoformat() }}",
+                }
+            TriggerDagRunOperator(task_id=f'trigger_{dag_id}', trigger_dag_id=dag_id, conf=conf)
+
+    fetch_champions_data_task >> transform_to_parquet_task >> save_to_s3_task >> trigger_group
