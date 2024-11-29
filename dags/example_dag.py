@@ -9,6 +9,7 @@ default_args = {
     'start_date': datetime(2023, 5, 1),
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
+    'catchup': False
 }
 
 # Create the DAG with the specified schedule interval
