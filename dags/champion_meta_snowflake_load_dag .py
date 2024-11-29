@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 SNOWFLAKE_DATABASE = Variable.get("SNOWFLAKE_DATABASE", default_var=None)
 SNOWFLAKE_SCHEMA = Variable.get("SNOWFLAKE_SCHEMA", default_var=None)
 SNOWFLAKE_STAGE = Variable.get("SNOWFLAKE_STAGE_CHAMPION", default_var=None)
-SNOWFLAKE_CHAMPION_INFO_TABLE = Variable.get("SNOWFLAKE_MATCH_INFO_TABLE", default_var=None)
+SNOWFLAKE_CHAMPION_INFO_TABLE = Variable.get("SNOWFLAKE_CHAMPION_INFO_TABLE", default_var=None)
 BUCKET_NAME = Variable.get("BUCKET_NAME", default_var=None)
 AWS_ACCESS_KEY = Variable.get("AWS_ACCESS_KEY", default_var=None)
 AWS_SECRET_KEY = Variable.get("AWS_SECRET_KEY", default_var=None)
