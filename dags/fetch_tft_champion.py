@@ -97,7 +97,7 @@ def save_to_s3(**kwargs):
     if not BUCKET_NAME:
         logging.error("BUCKET_NAME is None. Should be selected.")
         raise
-    file_name = f"metadatachampion/{kwargs['execution_date'].strftime('%Y-%m-%d')}/champion_data.parquet"
+    file_name = f"metadata_champion/{kwargs['execution_date'].strftime('%Y-%m-%d')}/champion_data.parquet"
 
     aws_access_key = Variable.get("AWS_ACCESS_KEY")
     aws_secret_key = Variable.get("AWS_SECRET_KEY")
