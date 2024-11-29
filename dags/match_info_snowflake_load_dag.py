@@ -69,7 +69,7 @@ with DAG(
                 FROM @{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}
             )
             FILE_FORMAT = (TYPE = 'PARQUET')
-            PATTERN = '/*.parquet';
+            PATTERN = '.*\.parquet';
         """,
         autocommit=True,
     )
