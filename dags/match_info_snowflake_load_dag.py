@@ -36,7 +36,7 @@ with DAG(
         task_id="load_data_to_stage",
         snowflake_conn_id="snowflake_conn",
         sql=f"""
-    CREATE OR REPLACE STAGE {SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}_match
+    CREATE OR REPLACE STAGE {SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}_MATCH
     URL='s3://{BUCKET_NAME}/match_infos/{{{{ ds }}}}/'
     CREDENTIALS = (
         AWS_KEY_ID = '{{{{ var.value.AWS_ACCESS_KEY }}}}'
