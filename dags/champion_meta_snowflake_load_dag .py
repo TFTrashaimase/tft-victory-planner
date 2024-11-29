@@ -52,7 +52,7 @@ with DAG(
         task_id="create_bronze_champion_info",
         snowflake_conn_id="snowflake_conn",
         sql=f"""
-            CREATE TABLE IF NOT EXISTS {SNOWFLAKE_SCHEMA}.{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_CHAMPION_INFO_TABLE} (
+            CREATE TABLE IF NOT EXISTS {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_CHAMPION_INFO_TABLE} (
                 source STRING,
                 ingestion_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 data VARIANT
