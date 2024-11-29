@@ -17,6 +17,6 @@ dag = DAG('dbt_dag', default_args=default_args, schedule_interval=timedelta(days
 # Define the dbt run command as a BashOperator
 run_dbt_model = BashOperator(
     task_id='run_dbt_model',
-    bash_command='dbt build --profiles-dir /opt/airflow/dbt --project-dir /opt/airflow/dbt',
+    bash_command='cd /opt/airflow/dbt && dbt build --profiles-dir /opt/airflow/dbt --project-dir /opt/airflow/dbt',
     dag=dag
 )
