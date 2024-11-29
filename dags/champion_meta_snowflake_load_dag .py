@@ -5,7 +5,6 @@ from airflow.models import Variable
 from datetime import datetime, timedelta
 
 # 환경 변수 가져오기
-SNOWFLAKE_CONN_ID = Variable.get("SNOWFLAKE_CONN_ID", default_var="snowflake_default")
 SNOWFLAKE_DATABASE = Variable.get("SNOWFLAKE_DATABASE", default_var=None)
 SNOWFLAKE_SCHEMA = Variable.get("SNOWFLAKE_SCHEMA", default_var=None)
 SNOWFLAKE_STAGE = Variable.get("SNOWFLAKE_STAGE", default_var=None)
@@ -67,13 +66,13 @@ with DAG(
         task_id="copy_into_bronze_champion_info",
         snowflake_conn_id="snowflake_conn",
         sql=f"""
-            COPY INTO {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.RAW_CHAMPION_META
+            COPY INTO {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_CHAMPION_INFO_TABLE}
             FROM (
                 SELECT
-                's3://tft-team2-rawdata/metadata_champion/{{{{ ds }}}}/champion_data.parquet' AS source,
-                CURRENT_TIMESTAMP() AS ingestion_date,
-                $1 data
-                FROM @{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}_champion
+                    's3://tft-team2-rawdata/metadata_champion/{{{{ ds }}}}/' AS source,
+                    CURRENT_TIMESTAMP() AS ingestion_date,
+                    $1 data
+                FROM @{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}_CHAMPION
             )
             FILE_FORMAT = (TYPE = 'PARQUET')
             PATTERN = '.*\.parquet';
@@ -93,6 +92,7 @@ with DAG(
     (
         load_data_to_stage
         >> is_stage_data_ready
+        >> create_bronze_champion_info
         >> copy_into_bronze_champion_info
         >> trigger_dbt_from_champ_meta
     )

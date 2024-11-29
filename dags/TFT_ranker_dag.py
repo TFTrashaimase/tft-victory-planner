@@ -174,6 +174,7 @@ def get_tier(**kwargs):
                 response.raise_for_status()
                 data = response.json()
 
+
                 if len(data) >= 10:
                     logging.info(f"Fetched {len(data)} records for Tier={tier}, Divisiozn={division}")
                     return data[:10]
@@ -379,6 +380,7 @@ def matching_info_to_s3(**kwargs):
 
             print("=================================================================")
             print(f"file content: \n{response}")
+
             try:
                 # json을 PyArrow로 변환 후 S3에 업로드
                 data = normalize_json(process_nested_json(data))
