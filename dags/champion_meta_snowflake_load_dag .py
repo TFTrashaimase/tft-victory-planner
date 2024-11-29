@@ -32,7 +32,7 @@ with DAG(
     load_data_to_stage = SnowflakeOperator(
         task_id="load_data_to_stage",
         snowflake_conn_id="snowflake_conn",
-        sql=f"""CREATE OR REPLACE STAGE {SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}_CHAMPION
+        sql=f"""CREATE OR REPLACE STAGE {SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}
             URL='s3://{BUCKET_NAME}/metadata_champion/{{{{ ds }}}}/'
             CREDENTIALS = (AWS_KEY_ID = '{{{{ var.value.AWS_ACCESS_KEY }}}}' AWS_SECRET_KEY = '{{{{ var.value.AWS_SECRET_KEY }}}}')
             FILE_FORMAT=(TYPE='PARQUET')""",
@@ -43,7 +43,7 @@ with DAG(
     is_stage_data_ready = SnowflakeOperator(
         task_id="is_stage_data_ready",
         snowflake_conn_id="snowflake_conn",
-        sql=f"LIST @{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}_CHAMPION;",
+        sql=f"LIST @{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE};",
         autocommit=True,
     )
 
@@ -72,7 +72,7 @@ with DAG(
                     's3://tft-team2-rawdata/metadata_champion/{{{{ ds }}}}/' AS source,
                     CURRENT_TIMESTAMP() AS ingestion_date,
                     $1 data
-                FROM @{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}_CHAMPION
+                FROM @{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}
             )
             FILE_FORMAT = (TYPE = 'PARQUET')
             PATTERN = '.*\.parquet';

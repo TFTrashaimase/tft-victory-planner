@@ -37,7 +37,7 @@ with DAG(
         task_id="load_data_to_stage",
         snowflake_conn_id="snowflake_conn",
         sql=f"""
-            CREATE OR REPLACE STAGE {SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}_MATCH
+            CREATE OR REPLACE STAGE {SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}
                 URL='s3://{BUCKET_NAME}/match_infos/{{{{ ds }}}}/' 
                 CREDENTIALS = (AWS_KEY_ID = '{{{{ var.value.AWS_ACCESS_KEY }}}}'AWS_SECRET_KEY = '{{{{ var.value.AWS_SECRET_KEY }}}}')
             FILE_FORMAT=(TYPE='PARQUET')
@@ -49,7 +49,7 @@ with DAG(
     is_stage_data_ready = SnowflakeOperator(
         task_id="is_stage_data_ready",
         snowflake_conn_id="snowflake_conn",
-        sql=f"LIST @{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}_MATCH;",
+        sql=f"LIST @{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE};",
         autocommit=True,
     )
 
