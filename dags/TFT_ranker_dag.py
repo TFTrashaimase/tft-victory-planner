@@ -193,21 +193,6 @@ def process_puuid_data(**kwargs):
                 result_dict[key] = [d[key]]
             else:
                 result_dict[key].append(d[key])
-    
-    # table = pa.Table.from_pydict(result_dict)
-    # buffer = io.BytesIO()
-    # pq.write_table(table, buffer)
-    # buffer.seek(0)  # 버퍼 포인터를 처음으로 이동
-    # buffer_writer = buffer.getvalue()
-
-    # 3. S3 업로드
-    # file_name = exe_string + '/' + 'puuid' + '_' + exe_string + '.parquet'
-    # s3.put_object(
-    #     Bucket=BUCKET_NAME,
-    #     Key=file_name,
-    #     Body=bytes(buffer_writer),
-    #     ContentType='application/octet-stream'  # Parquet 파일에 적합한 MIME 타입
-    #  )
 
     return raw_puuid_data
 
@@ -295,19 +280,6 @@ def process_matching_ids(**kwargs):
             logging.info(f"Matching IDs for puuid {puuid}: {matching_ids}")
         
         full_matching_ids = pad_dict_to_max_length(full_matching_ids)
-
-#         table = pa.Table.from_pydict(full_matching_ids)
-#         file_name = exe_string + '/' + 'matching_ids' + '_' + exe_string + '.parquet'
-#         buffer = io.BytesIO()
-#         pq.write_table(table, buffer)
-#         buffer.seek(0)  # 버퍼 포인터를 처음으로 이동
-#         buffer_writer = buffer.getvalue()
-#         s3.put_object(
-#             Bucket=BUCKET_NAME,
-#             Key=file_name,
-#             Body=bytes(buffer_writer),
-#             ContentType='application/octet-stream' # Parquet 파일은 이진 형식이므로 이 MIME 타입을 사용하여 파일을 전송한다.
-#         )
     else:
         logging.error(f"{puuid}: No match data for this puuid found from process_data_task in TFT_ranker_dag.py")
 
