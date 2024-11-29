@@ -51,7 +51,7 @@ with DAG(
     is_stage_data_ready = SnowflakeOperator(
         task_id="is_stage_data_ready",
         snowflake_conn_id="snowflake_conn",
-        sql=f"LIST @{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}_match;",
+        sql=f"LIST @{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}_MATCH;",
         autocommit=True,
     )
 
@@ -74,19 +74,9 @@ with DAG(
         autocommit=True,
     )
 
-    # 
-    # # 4. 스테이지 내부 파일 정리
-    # clean_stage_data = SnowflakeOperator(
-    #     task_id="clean_stage_data",
-    #     snowflake_conn_id="snowflake_conn",
-    #     sql=f"REMOVE @{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE};",
-    #     autocommit=True,
-    # )
-
     # 작업 순서 정의
     (
         load_data_to_stage
         >> is_stage_data_ready
         >> copy_into_bronze_match_info
-        # >> clean_stage_data
     )

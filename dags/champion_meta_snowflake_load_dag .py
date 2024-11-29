@@ -26,6 +26,7 @@ with DAG(
     catchup=False,
     description="DAG to load champion's metadata Parquet files from S3 to Snowflaktere, process, and clean stage",
 ) as snowflake_load_dag:
+    
 
     # 1. Snowflake 스테이지에 데이터 적재
     load_data_to_stage = SnowflakeOperator(
@@ -66,18 +67,9 @@ with DAG(
     )
     
 
-    # 4. 스테이지 내부 파일 정리
-    clean_stage_data = SnowflakeOperator(
-        task_id="clean_stage_data",
-        snowflake_conn_id="snowflake_conn",
-        sql=f"REMOVE @{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE};",
-        autocommit=True,
-    )
-
     # 작업 순서 정의
     (
         load_data_to_stage
         >> is_stage_data_ready
         >> copy_into_bronze_champion_info
-        >> clean_stage_data
     )
