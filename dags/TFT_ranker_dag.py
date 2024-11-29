@@ -11,8 +11,8 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 from airflow.models import Variable
-from airflow.operators.trigger_dagrun import TriggerDagRunOperator  # 나중에 필요함
-from airflow.utils.task_group import TaskGroup  # 나중에 필요함
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator  
+from airflow.utils.task_group import TaskGroup  
 
 # Variables 읽어오기 - .env 참고
 API_KEY = Variable.get("API_KEY", default_var=None)
@@ -24,13 +24,13 @@ AWS_ACCESS_KEY_ID = Variable.get("AWS_ACCESS_KEY", default_var=None)
 AWS_SECRET_ACCESS_KEY = Variable.get("AWS_SECRET_KEY", default_var=None)
 
 # s3 버킷 설정
-s3 = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY_ID, aws_secret_access_key=AWS_SECRET_ACCESS_KEY, region_name='ap-northeast-2')  # 서울 리전 
+s3 = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY_ID, aws_secret_access_key=AWS_SECRET_ACCESS_KEY, region_name='ap-northeast-2')
 
 # 상수 정의
 tiers = ["DIAMOND", "EMERALD", "PLATINUM", "GOLD", "SILVER", "BRONZE"]
 divisions = ["I", "II", "III", "IV"]
 page = 1
-MATCHES_COUNT = 1  # 한 번에 가져올 매치 수, 원한다면 수정해서 작업. 
+MATCHES_COUNT = 1  # 한 번에 가져올 매치 수, 원한다면 수정해서 작업. 테스트는 1, 디폴트는 20
 
 # Variables가 없다면 에러 발생
 if not API_KEY:
@@ -54,8 +54,13 @@ if not AWS_ACCESS_KEY_ID:
 if not AWS_SECRET_ACCESS_KEY:
     raise ValueError("환경 변수 AWS_SECRET_ACCESS_KEY의 확인이 필요합니다.")
 
-# Summoner ID로 유저 데이터를 수집하는 함수 - 챌린저, 그랜드 마스터, 마스터
+
 def get_entries_by_summoner(summoner_id, **kwargs):
+    """
+    Summoner ID기반으로 API를 호출하여
+    puuid가 들어간 유저 데이터를 수집하는 함수 
+    챌린저, 그랜드 마스터, 마스터 데이터 수집에 사용
+    """
     url = f"{BASE_URL}/tft/league/v1/entries/by-summoner/{summoner_id}"
 
     try:
@@ -72,8 +77,10 @@ def get_entries_by_summoner(summoner_id, **kwargs):
         logging.error(f"Error fetching data for Summoner ID {summoner_id}: {e}")
         raise
 
-# 챌린저 유저 SummonerId를 받아와서 다른 api를 통해 puuid를 포함한 유저 데이터를 반환
 def get_challenger(**kwargs):
+    """
+    챌린저 유저 SummonerId를 받아와서 다른 api를 통해 puuid를 포함한 유저 데이터를 반환
+    """
     url = f"{BASE_URL}/tft/league/v1/challenger?queue={QUEUE_TYPE}"
     try:
         response = requests.get(url, headers={"X-Riot-Token": API_KEY})
@@ -98,8 +105,10 @@ def get_challenger(**kwargs):
         logging.error(f"Error fetching Challenger data: {e}")
         return None
 
-# 그랜드 마스터 유저 SummonerId를 받아와서 다른 api를 통해 puuid를 포함한 유저 데이터를 반환
 def get_grandmaster(**kwargs):
+    """
+    그랜드 마스터 유저 SummonerId를 받아와서 다른 api를 통해 puuid를 포함한 유저 데이터를 반환
+    """
     url = f"{BASE_URL}/tft/league/v1/grandmaster?queue={QUEUE_TYPE}"
     try:
         response = requests.get(url, headers={"X-Riot-Token": API_KEY})
@@ -124,8 +133,10 @@ def get_grandmaster(**kwargs):
         logging.error(f"Error fetching Grandmaster data: {e}")
         return None
 
-# 마스터 유저 SummonerId를 받아와서 다른 api를 통해 puuid를 포함한 유저 데이터를 반환
 def get_master(**kwargs):
+    """
+    마스터 유저 SummonerId를 받아와서 다른 api를 통해 puuid를 포함한 유저 데이터를 반환
+    """
     url = f"{BASE_URL}/tft/league/v1/master?queue={QUEUE_TYPE}"
     try:
         response = requests.get(url, headers={"X-Riot-Token": API_KEY})
@@ -150,8 +161,10 @@ def get_master(**kwargs):
         logging.error(f"Error fetching Master data: {e}")
         return None
 
-# 챌린저, 그랜드 마스터, 마스터까지 상위 랭크 유저가 100명이 되지 않는다면 100명 이상의 정보를 모으기 위해 그 아래 티어를 호출
 def get_tier(**kwargs):  
+    """
+    챌린저, 그랜드 마스터, 마스터까지 상위 랭크 유저가 100명이 되지 않는다면 100명 이상의 정보를 모으기 위해 그 아래 티어를 호출
+    """
     for tier in tiers:
         for division in divisions:
             time.sleep(2)
@@ -170,9 +183,10 @@ def get_tier(**kwargs):
                 continue
     return data[:10]
 
-# 상위 랭커들의 puuid 포함한 정보를 합쳐서 하나의 리스트로 반환
-# 이 과정에서 100 + 알파 명의 유저의 정보 역시 S3에 parquet으로 업로드
 def process_puuid_data(**kwargs):
+    """
+    상위 랭커들의 puuid 포함한 정보를 합쳐서 하나의 리스트로 반환
+    """
     ti = kwargs['ti']
     challenger_data = ti.xcom_pull(task_ids='get_challenger_task')
     grandmaster_data = ti.xcom_pull(task_ids='get_grandmaster_task')
@@ -196,8 +210,10 @@ def process_puuid_data(**kwargs):
 
     return raw_puuid_data
 
-# 상위 랭커들의 puuid 기반으로 API를 호출하여 Matching ID 목록을 가져오는 함수
 def get_matching_ids(puuid, **kwargs):
+    """
+    상위 랭커들의 puuid 기반으로 API를 호출하여 Matching ID 목록을 가져오는 함수
+    """
     url = f"https://asia.api.riotgames.com/tft/match/v1/matches/by-puuid/{puuid}/ids?start=0&count={MATCHES_COUNT}"
     request_header = {
         "X-Riot-Token": API_KEY
@@ -248,8 +264,11 @@ def get_matching_ids(puuid, **kwargs):
             return []
         
 
-# 딕셔너리 길이를 맞추어 주는 helper function
+
 def pad_dict_to_max_length(data_dict, pad_value=None):
+    """
+    딕셔너리 길이를 맞추어 주는 helper function
+    """
     # 최대 길이 계산
     max_length = max(len(lst) for lst in data_dict.values())
     
@@ -261,10 +280,10 @@ def pad_dict_to_max_length(data_dict, pad_value=None):
     
     return padded_dict
 
-
-# matching id를 하나의 리스트로 정리
 def process_matching_ids(**kwargs):
-    # TFT_ranker_dag.py의 process_data_task에서 puuid_list를 가져옵니다 (XCom을 사용)
+    """
+    matching id를 하나의 리스트로 정리
+    """
     puuid_list = kwargs['ti'].xcom_pull(task_ids='process_puuid_raw_data')  # 'process_data_task' 사용
     exe_datetime = kwargs['execution_date']  # execution_date 기준으로 폴더 명을 나눔
     exe_string = exe_datetime.strftime('%Y-%m-%d')
@@ -273,7 +292,7 @@ def process_matching_ids(**kwargs):
     if puuid_list:
         for user in puuid_list:
             puuid = user['puuid']
-            # puuid에 대해 matching ID를 가져옵니다
+            # puuid에 대해 matching ID를 가져옴
             time.sleep(2)
             matching_ids = get_matching_ids(puuid)
             full_matching_ids[exe_string + '_' + puuid + '_' + 'matching_id'] = matching_ids
@@ -285,8 +304,10 @@ def process_matching_ids(**kwargs):
 
     return full_matching_ids
 
-# 값들의 길이를 동일하게 맞추는 헬퍼 함수
 def ensure_uniform_length(data, target_length):
+    """
+    parquet으로 저장하기 위해 값들의 길이를 동일하게 맞추는 헬퍼 함수
+    """
     if isinstance(data, list):
         return data + list(repeat(None, target_length - len(data)))
     elif isinstance(data, dict):
@@ -294,10 +315,12 @@ def ensure_uniform_length(data, target_length):
     else:
         return [data] + list(repeat(None, target_length - 1))
 
-# 모든 값을 리스트로 변환하고 길이를 동일하게 맞춤
-# 딕셔너리, 그냥 스칼라는 그냥 리스트에 넣고 None을 길이에 맞추어 패딩
-# 리스트는 최대 길이에 맞춰 None을 넣어 패딩
 def normalize_json(data):
+    """
+    모든 값을 리스트로 변환하고 길이를 동일하게 맞춤
+    딕셔너리, 그냥 스칼라는 그냥 리스트에 넣고 None을 길이에 맞추어 패딩
+    리스트는 최대 길이에 맞춰 None을 넣어 패딩
+    """
     # 모든 값을 리스트로 변환
     for key in data:
         if not isinstance(data[key], list):
@@ -312,10 +335,9 @@ def normalize_json(data):
 
     return data
 
-# 중첩 JSON 처리
 def process_nested_json(data):
     """
-    중첩된 JSON 데이터를 처리합니다.
+    중첩된 JSON 데이터를 처리
     """
     if isinstance(data, dict):
         return {k: process_nested_json(v) for k, v in data.items()}
@@ -324,9 +346,10 @@ def process_nested_json(data):
     else:
         return data
 
-# s3://tft-team2-rawdata/match_infos/{YYYY-MM-DD}/{puuid}_{match_id}.parquet
-# s3에 적재
 def matching_info_to_s3(**kwargs):
+    """
+    S3에 matching_info를 적재
+    """
     exe_datetime = kwargs['execution_date']  # execution_date 기준으로 폴더 명을 나눔
     exe_string = exe_datetime.strftime('%Y-%m-%d')
     match_data = kwargs['ti'].xcom_pull(task_ids='get_matching_ids_task')  # 매치데이터를 받아옴
@@ -351,11 +374,11 @@ def matching_info_to_s3(**kwargs):
 
             file_name = f"match_infos/{exe_string}/{user.split('_')[1]}_{match}.parquet"
             print("=================================================================")
-            print(file_name)
+            logging.info(f"matching_info file uploading: {file_name}")
             print("=================================================================")
 
             print("=================================================================")
-            print(response)
+            print(f"file content: \n{response}")
             try:
                 # json을 PyArrow로 변환 후 S3에 업로드
                 data = normalize_json(process_nested_json(data))

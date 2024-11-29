@@ -32,7 +32,7 @@ with DAG(
 ) as snowflake_load_dag:
 
 
-    # # 1. Snowflake 스테이지에 데이터 적재
+    # 1. Snowflake 스테이지에 데이터 적재
     load_data_to_stage = SnowflakeOperator(
         task_id="load_data_to_stage",
         snowflake_conn_id="snowflake_conn",
@@ -48,7 +48,7 @@ with DAG(
         autocommit=True,
     )
 
-    # # 2. 스테이지에 적재가 잘 되었는지 확인
+    # 2. 스테이지에 적재가 잘 되었는지 확인
     is_stage_data_ready = SnowflakeOperator(
         task_id="is_stage_data_ready",
         snowflake_conn_id="snowflake_conn",
@@ -56,7 +56,7 @@ with DAG(
         autocommit=True,
     )
 
-    # # 3. 스테이지에서 BRONZE_TFT_MATCH_INFO 테이블로 데이터 복사
+    # 3. 스테이지에서 BRONZE_TFT_MATCH_INFO 테이블로 데이터 복사
     copy_into_bronze_match_info = SnowflakeOperator(
         task_id="copy_into_bronze_match_info",
         snowflake_conn_id="snowflake_conn",
@@ -89,6 +89,3 @@ with DAG(
         >> copy_into_bronze_match_info
         >> trigger_dbt_from_match_info
     )
-
-
-
