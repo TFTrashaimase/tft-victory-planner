@@ -1,7 +1,6 @@
 {{ config(
     materialized='incremental',
     unique_key='id',
-    schema='SILVER_DATA'
 ) }}
 
 WITH bronze_data AS (
@@ -12,7 +11,7 @@ WITH bronze_data AS (
 )
 
 SELECT
-    id_seq.NEXTVAL AS id,
+    ROW_NUMBER() OVER (ORDER BY p.value:puuid) AS id,
     data:metadata:match_id::STRING AS match_id,
     p.value:puuid::STRING AS puuid,
     t.value:name::STRING AS trait_name,

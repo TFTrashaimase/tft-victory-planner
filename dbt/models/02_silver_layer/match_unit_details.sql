@@ -12,7 +12,7 @@ WITH bronze_data AS (
 ),
 flattened_participants AS (
     SELECT
-        id_item.NEXTVAL AS id,
+        ROW_NUMBER() OVER (ORDER BY p.value:puuid) AS id,
         data:metadata:match_id::STRING AS match_id,
         p.value:puuid::STRING AS puuid,
         u.value:character_id::STRING AS character_id,
