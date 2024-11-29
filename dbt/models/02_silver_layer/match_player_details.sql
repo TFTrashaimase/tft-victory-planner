@@ -1,6 +1,5 @@
 {{ config(
-    materialized='table',
-    schema='SILVER_DATA'
+    materialized='table'
 ) }}
 
 WITH bronze_data AS (

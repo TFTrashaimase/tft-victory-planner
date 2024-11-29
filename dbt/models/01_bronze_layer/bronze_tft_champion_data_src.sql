@@ -1,6 +1,5 @@
 {{  config(
-    materialized = 'ephemeral', 
-    schema = 'RAW_DATA'
+    materialized = 'ephemeral'
 )}}
 SELECT
     *

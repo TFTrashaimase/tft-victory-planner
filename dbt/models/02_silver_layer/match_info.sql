@@ -1,7 +1,6 @@
 {{ config(
     materialized='incremental',
     unique_key='match_id',
-    schema='SILVER_DATA'
     )
 }}
 

@@ -18,5 +18,12 @@ clean-targets:
 models:
   dbt_snowflake_name:
     01_bronze_layer:
+      +schema: "RAW_DATA"
     02_silver_layer:
+      +schema: "SILVER_DATA"
     03_gold_layer:
+      +schema: "GOLD_DATA"
+
+seeds:
+  dbt_snowflake_name:
+    +schema: "RAW_DATA"
