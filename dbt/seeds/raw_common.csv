@@ -1,0 +1,6 @@
+code_type,code_value,code_description,order_no,use_yn
+STYLE,0,No Style,1,TRUE
+STYLE,1,Bronze,2,TRUE
+STYLE,2,Silver,3,TRUE
+STYLE,3,Gold,4,TRUE
+STYLE,4,Chromatic,5,TRUE

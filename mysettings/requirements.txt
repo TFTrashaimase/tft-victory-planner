@@ -25,23 +25,23 @@ apache-airflow-providers-amazon==9.1.0
 # apache-airflow-providers-snowflake
 apache-airflow-providers-snowflake==5.8.1
 
-# oauth2client
-oauth2client
-
 # sqlalchemy
-sqlalchemy
+sqlalchemy==1.4.49
+
+# dbt-core
+dbt-core==1.7.18
 
 # dbt-snowflake
 dbt-snowflake==1.7.1
 
 # boto3
-boto3
+boto3==1.35.68
 
 # pyarrow
-pyarrow
+pyarrow==18.1.0
 
 # pandas
-pandas
+pandas==2.2.3
 
-# dbt-core
-dbt-core
+# botocore
+botocore==1.35.69
