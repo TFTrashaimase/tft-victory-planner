@@ -30,7 +30,7 @@ s3 = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY_ID, aws_secret_access_k
 tiers = ["DIAMOND", "EMERALD", "PLATINUM", "GOLD", "SILVER", "BRONZE"]
 divisions = ["I", "II", "III", "IV"]
 page = 1
-MATCHES_COUNT = 20  # 한 번에 가져올 매치 수, 원한다면 수정해서 작업. 
+MATCHES_COUNT = 1  # 한 번에 가져올 매치 수, 원한다면 수정해서 작업. 
 
 # Variables가 없다면 에러 발생
 if not API_KEY:
@@ -81,8 +81,8 @@ def get_challenger(**kwargs):
         summoner_ids = response.json()["entries"]
         challenger_data = []
         if len(summoner_ids) > 0:
-            for challenger_info in summoner_ids:
-                time.sleep(1)
+            for challenger_info in summoner_ids[:10]:
+                time.sleep(2)
                 s_id = challenger_info["summonerId"]
 
                 challenger_data.append(get_entries_by_summoner(s_id))
@@ -107,7 +107,8 @@ def get_grandmaster(**kwargs):
         summoner_ids = response.json()["entries"]
         gmaster_data = []
         if len(summoner_ids) > 0:
-            for gmaster_info in summoner_ids:
+            for gmaster_info in summoner_ids[:10]:
+                time.sleep(2)
                 s_id = gmaster_info["summonerId"]
 
                 gmaster_data.append(get_entries_by_summoner(s_id))
@@ -131,8 +132,9 @@ def get_master(**kwargs):
         response.raise_for_status()
         summoner_ids = response.json()["entries"]
         master_data = []
-        if len(summoner_ids) > 0:
-            for master_info in summoner_ids:
+        if 10 >= len(summoner_ids) > 0:
+            for master_info in summoner_ids[:10]:
+                time.sleep(2)
                 s_id = master_info["summonerId"]
 
                 master_data.append(get_entries_by_summoner(s_id))
@@ -152,20 +154,21 @@ def get_master(**kwargs):
 def get_tier(**kwargs):  
     for tier in tiers:
         for division in divisions:
+            time.sleep(2)
             url = f"{BASE_URL}/tft/league/v1/entries/{tier}/{division}?queue={QUEUE_TYPE}&page={page}"
             try:
                 response = requests.get(url, headers={"X-Riot-Token": API_KEY})
                 response.raise_for_status()
                 data = response.json()
 
-                if len(data) >= 100:
+                if len(data) >= 10:
                     logging.info(f"Fetched {len(data)} records for Tier={tier}, Divisiozn={division}")
-                    return data
+                    return data[:10]
 
             except requests.exceptions.RequestException as e:
                 logging.error(f"Error fetching data for Tier={tier}, Division={division}: {e}")
                 continue
-    return data
+    return data[:10]
 
 # 상위 랭커들의 puuid 포함한 정보를 합쳐서 하나의 리스트로 반환
 # 이 과정에서 100 + 알파 명의 유저의 정보 역시 S3에 parquet으로 업로드
@@ -191,20 +194,20 @@ def process_puuid_data(**kwargs):
             else:
                 result_dict[key].append(d[key])
     
-    table = pa.Table.from_pydict(result_dict)
-    buffer = io.BytesIO()
-    pq.write_table(table, buffer)
-    buffer.seek(0)  # 버퍼 포인터를 처음으로 이동
-    buffer_writer = buffer.getvalue()
+    # table = pa.Table.from_pydict(result_dict)
+    # buffer = io.BytesIO()
+    # pq.write_table(table, buffer)
+    # buffer.seek(0)  # 버퍼 포인터를 처음으로 이동
+    # buffer_writer = buffer.getvalue()
 
     # 3. S3 업로드
-    file_name = exe_string + '/' + 'puuid' + '_' + exe_string + '.parquet'
-    s3.put_object(
-        Bucket=BUCKET_NAME,
-        Key=file_name,
-        Body=bytes(buffer_writer),
-        ContentType='application/octet-stream'  # Parquet 파일에 적합한 MIME 타입
-    )
+    # file_name = exe_string + '/' + 'puuid' + '_' + exe_string + '.parquet'
+    # s3.put_object(
+    #     Bucket=BUCKET_NAME,
+    #     Key=file_name,
+    #     Body=bytes(buffer_writer),
+    #     ContentType='application/octet-stream'  # Parquet 파일에 적합한 MIME 타입
+    #  )
 
     return raw_puuid_data
 
@@ -236,7 +239,7 @@ def get_matching_ids(puuid, **kwargs):
             how_many_api_call, remain_api_call = MATCHES_COUNT // 200, MATCHES_COUNT % 200
             full_return_data = []
             for cnt in range(how_many_api_call):
-                time.sleep(1)
+                time.sleep(2)
                 url = f"{BASE_URL}/tft/match/v1/matches/by-puuid/{puuid}/ids?start={cnt * 200}&count={MATCHES_COUNT}"
                 response = requests.get(url)
                 response.raise_for_status()
@@ -286,25 +289,25 @@ def process_matching_ids(**kwargs):
         for user in puuid_list:
             puuid = user['puuid']
             # puuid에 대해 matching ID를 가져옵니다
-            time.sleep(1)
+            time.sleep(2)
             matching_ids = get_matching_ids(puuid)
             full_matching_ids[exe_string + '_' + puuid + '_' + 'matching_id'] = matching_ids
             logging.info(f"Matching IDs for puuid {puuid}: {matching_ids}")
         
         full_matching_ids = pad_dict_to_max_length(full_matching_ids)
 
-        table = pa.Table.from_pydict(full_matching_ids)
-        file_name = exe_string + '/' + 'matching_ids' + '_' + exe_string + '.parquet'
-        buffer = io.BytesIO()
-        pq.write_table(table, buffer)
-        buffer.seek(0)  # 버퍼 포인터를 처음으로 이동
-        buffer_writer = buffer.getvalue()
-        s3.put_object(
-            Bucket=BUCKET_NAME,
-            Key=file_name,
-            Body=bytes(buffer_writer),
-            ContentType='application/octet-stream' # Parquet 파일은 이진 형식이므로 이 MIME 타입을 사용하여 파일을 전송한다.
-        )
+#         table = pa.Table.from_pydict(full_matching_ids)
+#         file_name = exe_string + '/' + 'matching_ids' + '_' + exe_string + '.parquet'
+#         buffer = io.BytesIO()
+#         pq.write_table(table, buffer)
+#         buffer.seek(0)  # 버퍼 포인터를 처음으로 이동
+#         buffer_writer = buffer.getvalue()
+#         s3.put_object(
+#             Bucket=BUCKET_NAME,
+#             Key=file_name,
+#             Body=bytes(buffer_writer),
+#             ContentType='application/octet-stream' # Parquet 파일은 이진 형식이므로 이 MIME 타입을 사용하여 파일을 전송한다.
+#         )
     else:
         logging.error(f"{puuid}: No match data for this puuid found from process_data_task in TFT_ranker_dag.py")
 
@@ -349,6 +352,7 @@ def process_nested_json(data):
     else:
         return data
 
+# s3://tft-team2-rawdata/match_infos/{YYYY-MM-DD}/{puuid}_{match_id}.parquet
 # s3에 적재
 def matching_info_to_s3(**kwargs):
     exe_datetime = kwargs['execution_date']  # execution_date 기준으로 폴더 명을 나눔
@@ -359,23 +363,27 @@ def matching_info_to_s3(**kwargs):
         logging.info("No match data to process")
         return exe_string
 
-
+    # API 호출 제한 => 1초에 20번, 2분에 100번
     for user in match_data.keys():
         time.sleep(0.5)
         matches = match_data[user]
 
-        for cnt, match in enumerate(matches):
-            if cnt % 50 == 0 and cnt > 0:
-                time.sleep(60)
+        for match in matches:
+            time.sleep(2)
             if match is None:
                 continue
-            time.sleep(0.5)
             match_api_url = f"https://asia.api.riotgames.com/tft/match/v1/matches/{match}"
             response = requests.get(match_api_url, headers={"X-Riot-Token": API_KEY})
             response.raise_for_status()
             data = response.json()
 
-            file_name = exe_string + '/match_infos/' + user + '_' + match + '_' + exe_string + '.parquet'
+            file_name = f"match_infos/{exe_string}/{user.split('_')[1]}_{match}.parquet"
+            print("=================================================================")
+            print(file_name)
+            print("=================================================================")
+
+            print("=================================================================")
+            print(response)
             try:
                 # json을 PyArrow로 변환 후 S3에 업로드
                 data = normalize_json(process_nested_json(data))
@@ -384,12 +392,13 @@ def matching_info_to_s3(**kwargs):
                 pq.write_table(table, buffer)
                 buffer.seek(0)  # 버퍼 포인터를 처음으로 이동
                 buffer_writer = buffer.getvalue()
-                s3.put_object(
+                s3_response = s3.put_object(
                     Bucket=BUCKET_NAME,
                     Key=file_name,
                     Body=bytes(buffer_writer),
                     ContentType='application/octet-stream' # Parquet 파일은 이진 형식이므로 이 MIME 타입을 사용하여 파일을 전송한다.
                 )
+                print(s3_response)
                 logging.info(f"Successfully uploaded {file_name} to S3.")
             except boto3.exceptions.Boto3Error as e:
                 logging.error(f"Failed to upload {file_name} to S3: {e}")
@@ -470,19 +479,18 @@ with DAG(
     )
 
     # 트리거할 DAG ID 리스트
-    # dag_ids_to_trigger = ['dag_ids_to_transform_and_load_data_to_snowflake']
+    dag_ids_to_trigger = ['match_info_snowflake_load_dag']
 
-    # with TaskGroup(group_id='trigger_snowflake_load_dags') as trigger_group:
-    #     for dag_id in dag_ids_to_trigger:
-    #         conf = {
-    #                 "s3_bucket_folder": "{{ task_instance.xcom_pull(task_ids='load_json_to_s3') }}",
-    #                 "triggered_by": "trigger_dynamic_dags", 
-    #                 "triggered_dag": dag_id,
-    #                 "execution_date": "{{ execution_date.isoformat() }}",
-    #             }
-    #         TriggerDagRunOperator(task_id=f'trigger_{dag_id}', trigger_dag_id=dag_id, conf=conf)
+    with TaskGroup(group_id='trigger_snowflake_load_dags') as trigger_group:
+        for dag_id in dag_ids_to_trigger:
+            conf = {
+                    "s3_bucket_folder": "{{ task_instance.xcom_pull(task_ids='load_json_to_s3') }}",
+                    "triggered_by": "TFT_Riot_API_Dag", 
+                    "triggered_dag": dag_id,
+                    "execution_date": "{{ execution_date.isoformat() }}",
+                }
+            TriggerDagRunOperator(task_id=f'trigger_{dag_id}', trigger_dag_id=dag_id, conf=conf)
 
 
 # 태스크 의존성 설정
-
-[challenger_task, grandmaster_task, master_task, tier_task] >> process_puuid >> matching_id_task >> matching_info_to_s3_task # >> trigger_group
+[challenger_task, grandmaster_task, master_task, tier_task] >> process_puuid >> matching_id_task >> matching_info_to_s3_task >> trigger_group
