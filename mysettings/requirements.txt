@@ -28,9 +28,6 @@ apache-airflow-providers-snowflake==5.8.1
 # sqlalchemy
 sqlalchemy==1.4.49
 
-# dbt-core
-dbt-core==1.7.18
-
 # dbt-snowflake
 dbt-snowflake==1.7.1
 
@@ -45,3 +42,6 @@ pandas>=2.1.2,<2.2
 
 # botocore
 botocore==1.35.69
+
+# dbt-core
+dbt-core==1.7.18
