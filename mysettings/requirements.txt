@@ -16,11 +16,23 @@ pyopenssl==24.2.1
 # apache-airflow-providers-mysql
 apache-airflow-providers-mysql==5.7.0
 
+# apache-airflow[snowflake]
+apache-airflow[snowflake]==2.9.1
+
+# apache-airflow-providers-amazon 
+apache-airflow-providers-amazon==9.1.0
+
+# apache-airflow-providers-snowflake
+apache-airflow-providers-snowflake==5.8.1
+
+# oauth2client
+oauth2client
+
 # sqlalchemy
 sqlalchemy==1.4.49
 
 # dbt-core
-dbt-core==1.8.9
+dbt-core==1.7.18
 
 # dbt-snowflake
 dbt-snowflake==1.7.1
