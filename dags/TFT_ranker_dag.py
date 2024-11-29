@@ -165,9 +165,12 @@ def get_tier(**kwargs):
     """
     챌린저, 그랜드 마스터, 마스터까지 상위 랭크 유저가 100명이 되지 않는다면 100명 이상의 정보를 모으기 위해 그 아래 티어를 호출
     """
+    data = []
     for tier in tiers:
         for division in divisions:
             time.sleep(2)
+            # https://kr.api.riotgames.com/tft/league/v1/entries/DIAMOND/II?queue=RANKED_TFT&page=1
+            # BASE_URL=https://kr.api.riotgames.com
             url = f"{BASE_URL}/tft/league/v1/entries/{tier}/{division}?queue={QUEUE_TYPE}&page={page}"
             try:
                 response = requests.get(url, headers={"X-Riot-Token": API_KEY})

@@ -11,9 +11,7 @@ default_args = {
     'depends_on_past': False,
     'start_date': datetime(2023, 5, 1),
     'retries': 1,
-    'schedule': "@once",
-    'retry_delay': timedelta(minutes=5),
-    'catchup': False
+    'retry_delay': timedelta(minutes=5)
 }
 
 def check_triggers(**kwargs):
@@ -48,7 +46,7 @@ def save_trigger_state(trigger_name, **kwargs):
 
 
 # Create the DAG with the specified schedule interval
-with DAG('dbt_run_dag', default_args=default_args, schedule_interval=timedelta(days=1)) as dag:
+with DAG('dbt_run_dag', default_args=default_args, schedule_interval=timedelta(days=1), catchup=False, schedule="@once") as dag:
 
     save_trigger_from_match_info = PythonOperator(
             task_id='save_trigger_from_match_info',

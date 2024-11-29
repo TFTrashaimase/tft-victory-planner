@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 # 환경 변수 가져오기  
 SNOWFLAKE_CONN_ID = Variable.get("SNOWFLAKE_CONN_ID", default_var="snowflake_default")
 SNOWFLAKE_DATABASE = Variable.get("SNOWFLAKE_DATABASE", default_var=None)
-SNOWFLAKE_SCHEMA = Variable.get("SNOWFLAKE_SCHEMA", default_var=None)
+SNOWFLAKE_SCHEMA = Variable.get("SNOWFLAKE_SCHEMA", default_var=None) 
 SNOWFLAKE_STAGE = Variable.get("SNOWFLAKE_STAGE", default_var=None)
 BUCKET_NAME = Variable.get("BUCKET_NAME", default_var=None)
 AWS_ACCESS_KEY = Variable.get("AWS_ACCESS_KEY", default_var=None)
