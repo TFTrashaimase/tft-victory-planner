@@ -96,7 +96,7 @@ with DAG(
     (
         load_data_to_stage
         >> is_stage_data_ready
-        >> copy_into_bronze_match_info
         >> create_bronze_match_info
+        >> copy_into_bronze_match_info
         >> trigger_dbt_from_match_info
     )
