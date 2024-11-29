@@ -81,7 +81,7 @@ def get_challenger(**kwargs):
         summoner_ids = response.json()["entries"]
         challenger_data = []
         if len(summoner_ids) > 0:
-            for challenger_info in summoner_ids:
+            for challenger_info in summoner_ids[:10]:
                 time.sleep(2)
                 s_id = challenger_info["summonerId"]
 
@@ -107,7 +107,7 @@ def get_grandmaster(**kwargs):
         summoner_ids = response.json()["entries"]
         gmaster_data = []
         if len(summoner_ids) > 0:
-            for gmaster_info in summoner_ids:
+            for gmaster_info in summoner_ids[:10]:
                 time.sleep(2)
                 s_id = gmaster_info["summonerId"]
 
@@ -133,7 +133,7 @@ def get_master(**kwargs):
         summoner_ids = response.json()["entries"]
         master_data = []
         if 10 >= len(summoner_ids) > 0:
-            for master_info in summoner_ids:
+            for master_info in summoner_ids[:10]:
                 time.sleep(2)
                 s_id = master_info["summonerId"]
 
@@ -163,12 +163,12 @@ def get_tier(**kwargs):
 
                 if len(data) >= 10:
                     logging.info(f"Fetched {len(data)} records for Tier={tier}, Divisiozn={division}")
-                    return data
+                    return data[:10]
 
             except requests.exceptions.RequestException as e:
                 logging.error(f"Error fetching data for Tier={tier}, Division={division}: {e}")
                 continue
-    return data
+    return data[:10]
 
 # 상위 랭커들의 puuid 포함한 정보를 합쳐서 하나의 리스트로 반환
 # 이 과정에서 100 + 알파 명의 유저의 정보 역시 S3에 parquet으로 업로드
@@ -194,20 +194,20 @@ def process_puuid_data(**kwargs):
             else:
                 result_dict[key].append(d[key])
     
-    table = pa.Table.from_pydict(result_dict)
-    buffer = io.BytesIO()
-    pq.write_table(table, buffer)
-    buffer.seek(0)  # 버퍼 포인터를 처음으로 이동
-    buffer_writer = buffer.getvalue()
+    # table = pa.Table.from_pydict(result_dict)
+    # buffer = io.BytesIO()
+    # pq.write_table(table, buffer)
+    # buffer.seek(0)  # 버퍼 포인터를 처음으로 이동
+    # buffer_writer = buffer.getvalue()
 
     # 3. S3 업로드
-    file_name = exe_string + '/' + 'puuid' + '_' + exe_string + '.parquet'
-    s3.put_object(
-        Bucket=BUCKET_NAME,
-        Key=file_name,
-        Body=bytes(buffer_writer),
-        ContentType='application/octet-stream'  # Parquet 파일에 적합한 MIME 타입
-    )
+    # file_name = exe_string + '/' + 'puuid' + '_' + exe_string + '.parquet'
+    # s3.put_object(
+    #     Bucket=BUCKET_NAME,
+    #     Key=file_name,
+    #     Body=bytes(buffer_writer),
+    #     ContentType='application/octet-stream'  # Parquet 파일에 적합한 MIME 타입
+    #  )
 
     return raw_puuid_data
 
@@ -296,18 +296,18 @@ def process_matching_ids(**kwargs):
         
         full_matching_ids = pad_dict_to_max_length(full_matching_ids)
 
-        table = pa.Table.from_pydict(full_matching_ids)
-        file_name = exe_string + '/' + 'matching_ids' + '_' + exe_string + '.parquet'
-        buffer = io.BytesIO()
-        pq.write_table(table, buffer)
-        buffer.seek(0)  # 버퍼 포인터를 처음으로 이동
-        buffer_writer = buffer.getvalue()
-        s3.put_object(
-            Bucket=BUCKET_NAME,
-            Key=file_name,
-            Body=bytes(buffer_writer),
-            ContentType='application/octet-stream' # Parquet 파일은 이진 형식이므로 이 MIME 타입을 사용하여 파일을 전송한다.
-        )
+#         table = pa.Table.from_pydict(full_matching_ids)
+#         file_name = exe_string + '/' + 'matching_ids' + '_' + exe_string + '.parquet'
+#         buffer = io.BytesIO()
+#         pq.write_table(table, buffer)
+#         buffer.seek(0)  # 버퍼 포인터를 처음으로 이동
+#         buffer_writer = buffer.getvalue()
+#         s3.put_object(
+#             Bucket=BUCKET_NAME,
+#             Key=file_name,
+#             Body=bytes(buffer_writer),
+#             ContentType='application/octet-stream' # Parquet 파일은 이진 형식이므로 이 MIME 타입을 사용하여 파일을 전송한다.
+#         )
     else:
         logging.error(f"{puuid}: No match data for this puuid found from process_data_task in TFT_ranker_dag.py")
 
@@ -377,8 +377,13 @@ def matching_info_to_s3(**kwargs):
             response.raise_for_status()
             data = response.json()
 
-            # s3://tft-team2-rawdata/match_infos/{YYYY-MM-DD}/{puuid}_{match_id}.parquet
-            file_name = 'tft-team2-rawdata/match_infos/' + exe_string + '/' + user + '_' + match + '.parquet'
+            file_name = f"match_infos/{exe_string}/{user.split('_')[1]}_{match}.parquet"
+            print("=================================================================")
+            print(file_name)
+            print("=================================================================")
+
+            print("=================================================================")
+            print(response)
             try:
                 # json을 PyArrow로 변환 후 S3에 업로드
                 data = normalize_json(process_nested_json(data))
@@ -387,12 +392,13 @@ def matching_info_to_s3(**kwargs):
                 pq.write_table(table, buffer)
                 buffer.seek(0)  # 버퍼 포인터를 처음으로 이동
                 buffer_writer = buffer.getvalue()
-                s3.put_object(
+                s3_response = s3.put_object(
                     Bucket=BUCKET_NAME,
                     Key=file_name,
                     Body=bytes(buffer_writer),
                     ContentType='application/octet-stream' # Parquet 파일은 이진 형식이므로 이 MIME 타입을 사용하여 파일을 전송한다.
                 )
+                print(s3_response)
                 logging.info(f"Successfully uploaded {file_name} to S3.")
             except boto3.exceptions.Boto3Error as e:
                 logging.error(f"Failed to upload {file_name} to S3: {e}")
@@ -473,7 +479,7 @@ with DAG(
     )
 
     # 트리거할 DAG ID 리스트
-    dag_ids_to_trigger = ['snowflake_load_dag']
+    dag_ids_to_trigger = ['match_info_snowflake_load_dag']
 
     with TaskGroup(group_id='trigger_snowflake_load_dags') as trigger_group:
         for dag_id in dag_ids_to_trigger:
@@ -488,5 +494,3 @@ with DAG(
 
 # 태스크 의존성 설정
 [challenger_task, grandmaster_task, master_task, tier_task] >> process_puuid >> matching_id_task >> matching_info_to_s3_task >> trigger_group
-
-# 제가 짠건데 문제가 많아요

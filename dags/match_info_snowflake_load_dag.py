@@ -11,6 +11,7 @@ SNOWFLAKE_STAGE = Variable.get("SNOWFLAKE_STAGE", default_var=None)
 BUCKET_NAME = Variable.get("BUCKET_NAME", default_var=None)
 AWS_ACCESS_KEY = Variable.get("AWS_ACCESS_KEY", default_var=None)
 AWS_SECRET_KEY = Variable.get("AWS_SECRET_KEY", default_var=None)
+SNOW_FLAKE_MATCH_INFO_TABLE = Variable.get("SNOW_FLAKE_MATCH_INFO_TABLE", default_var=None)
 
 
 # DAG 기본 설정
@@ -35,8 +36,8 @@ with DAG(
         task_id="load_data_to_stage",
         snowflake_conn_id="snowflake_conn",
         sql=f"""
-    CREATE OR REPLACE STAGE {SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}
-    URL='s3://{BUCKET_NAME}/{{ dag_run.conf.get('execution_date') }}'
+    CREATE OR REPLACE STAGE {SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}_match
+    URL='s3://{BUCKET_NAME}/match_infos/{{{{ ds }}}}/'
     CREDENTIALS = (
         AWS_KEY_ID = '{{{{ var.value.AWS_ACCESS_KEY }}}}'
         AWS_SECRET_KEY = '{{{{ var.value.AWS_SECRET_KEY }}}}'
@@ -50,7 +51,7 @@ with DAG(
     is_stage_data_ready = SnowflakeOperator(
         task_id="is_stage_data_ready",
         snowflake_conn_id="snowflake_conn",
-        sql=f"LIST @{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE};",
+        sql=f"LIST @{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}_match;",
         autocommit=True,
     )
 
@@ -59,32 +60,33 @@ with DAG(
         task_id="copy_into_bronze_match_info",
         snowflake_conn_id="snowflake_conn",
         sql=f"""
-            COPY INTO {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.BRONZE_TFT_MATCH_INFO
+            COPY INTO {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.{SNOW_FLAKE_MATCH_INFO_TABLE}
             FROM (
                 SELECT
-                's3://{BUCKET_NAME}/{{ dag_run.conf.get('execution_date') }}' AS source,
+                's3://{BUCKET_NAME}/match_infos/{{{{ ds }}}}/' AS source,
                 CURRENT_TIMESTAMP() AS ingestion_date,
                 $1 data
                 FROM @{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE}
             )
             FILE_FORMAT = (TYPE = 'PARQUET')
-            PATTERN = '.*match_infos/.*\.parquet';
+            PATTERN = '/*.parquet';
         """,
         autocommit=True,
     )
 
+    # 
     # # 4. 스테이지 내부 파일 정리
-    clean_stage_data = SnowflakeOperator(
-        task_id="clean_stage_data",
-        snowflake_conn_id="snowflake_conn",
-        sql=f"REMOVE @{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE};",
-        autocommit=True,
-    )
+    # clean_stage_data = SnowflakeOperator(
+    #     task_id="clean_stage_data",
+    #     snowflake_conn_id="snowflake_conn",
+    #     sql=f"REMOVE @{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_STAGE};",
+    #     autocommit=True,
+    # )
 
     # 작업 순서 정의
     (
         load_data_to_stage
         >> is_stage_data_ready
         >> copy_into_bronze_match_info
-        >> clean_stage_data
+        # >> clean_stage_data
     )
