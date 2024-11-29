@@ -14,7 +14,6 @@ AWS_ACCESS_KEY = Variable.get("AWS_ACCESS_KEY", default_var=None)
 AWS_SECRET_KEY = Variable.get("AWS_SECRET_KEY", default_var=None)
 SNOWFLAKE_MATCH_INFO_TABLE = Variable.get("SNOWFLAKE_MATCH_INFO_TABLE", default_var=None)
 
-
 # DAG 기본 설정
 default_args = {
     "retries": 1,
