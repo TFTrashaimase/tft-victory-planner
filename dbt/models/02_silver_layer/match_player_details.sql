@@ -11,7 +11,7 @@ WITH bronze_data AS (
 )
 SELECT
     -- JSON 데이터에서 추출
-    JSON_DATA:metadata:match_id::STRING AS match_id,
+    data:metadata:match_id::STRING AS match_id,
     p.value:puuid::STRING AS puuid,
     p.value:gold_left::INTEGER AS gold_left,
     p.value:last_round::INTEGER AS last_round,
@@ -25,5 +25,5 @@ SELECT
     p.value:win AS win,
     CURRENT_TIMESTAMP() AS created_at
 FROM bronze_data,
-LATERAL FLATTEN(INPUT => json_data:info:participants) p,
+LATERAL FLATTEN(INPUT => data:info:participants) p,
 LATERAL FLATTEN(INPUT => p.value:traits) t
