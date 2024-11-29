@@ -22,12 +22,7 @@ SELECT
     p.value:riotIdTagline::STRING AS riot_id_tagline,
     p.value:time_eliminated::FLOAT AS time_eliminated,
     p.value:total_damage_to_players::INTEGER AS total_damage_to_players,
-
-    -- 승리 여부 계산
-    CASE 
-        WHEN p.value:placement = 1 THEN TRUE
-        ELSE FALSE
-    END AS win,
+    p.value:win AS win,
     CURRENT_TIMESTAMP() AS created_at
 FROM bronze_data,
 LATERAL FLATTEN(INPUT => json_data:info:participants) p,
