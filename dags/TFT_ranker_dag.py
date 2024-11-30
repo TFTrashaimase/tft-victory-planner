@@ -1,3 +1,18 @@
+from airflow.decorators import task, dag
+from airflow.utils.dates import days_ago
+from airflow.models import Variable
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
+from airflow.utils.task_group import TaskGroup
+from datetime import datetime, timedelta
+import requests
+import logging
+import time
+import boto3
+import pyarrow as pa
+import pyarrow.parquet as pq
+import io
+from itertools import repeat
+
 import logging
 import requests
 import boto3
@@ -6,6 +21,8 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import io
 
+from airflow.models import TaskInstance
+from airflow.utils.dates import days_ago
 from itertools import repeat
 from airflow import DAG
 from airflow.operators.python import PythonOperator
@@ -77,6 +94,7 @@ def get_entries_by_summoner(summoner_id, **kwargs):
         logging.error(f"Error fetching data for Summoner ID {summoner_id}: {e}")
         raise
 
+@task
 def get_challenger(**kwargs):
     """
     챌린저 유저 SummonerId를 받아와서 다른 api를 통해 puuid를 포함한 유저 데이터를 반환
@@ -88,8 +106,8 @@ def get_challenger(**kwargs):
         summoner_ids = response.json()["entries"]
         challenger_data = []
         if len(summoner_ids) > 0:
-            for challenger_info in summoner_ids[:10]:
-                time.sleep(2)
+            for challenger_info in summoner_ids:
+                time.sleep(1.3)
                 s_id = challenger_info["summonerId"]
 
                 challenger_data.append(get_entries_by_summoner(s_id))
@@ -117,7 +135,7 @@ def get_grandmaster(**kwargs):
         summoner_ids = response.json()["entries"]
         gmaster_data = []
         if len(summoner_ids) > 0:
-            for gmaster_info in summoner_ids[:10]:
+            for gmaster_info in summoner_ids:
                 time.sleep(2)
                 s_id = gmaster_info["summonerId"]
 
@@ -162,32 +180,6 @@ def get_master(**kwargs):
         logging.error(f"Error fetching Master data: {e}")
         return None
 
-# def get_tier(**kwargs):  
-#     """
-#    챌린저, 그랜드 마스터, 마스터까지 상위 랭크 유저가 100명이 되지 않는다면 100명 이상의 정보를 모으기 위해 그 아래 티어를 호출
-#    """
-#    data = []
-#    for tier in tiers:
-#        for division in divisions:
-#            time.sleep(2)
-#            # https://kr.api.riotgames.com/tft/league/v1/entries/DIAMOND/II?queue=RANKED_TFT&page=1
-#            # BASE_URL=https://kr.api.riotgames.com
-#            url = f"{BASE_URL}/tft/league/v1/entries/{tier}/{division}?queue={QUEUE_TYPE}&page={page}"
-#            try:
-#                response = requests.get(url, headers={"X-Riot-Token": API_KEY})
-#                response.raise_for_status()
-#                data = response.json()
-
-
-#                if len(data) >= 10:
-#                    logging.info(f"Fetched {len(data)} records for Tier={tier}, Divisiozn={division}")
-#                    return data[:10]
-
-#            except requests.exceptions.RequestException as e:
-#                logging.error(f"Error fetching data for Tier={tier}, Division={division}: {e}")
-#                continue
-#    return data[:10]
-
 def process_puuid_data(**kwargs):
     """
     상위 랭커들의 puuid 포함한 정보를 합쳐서 하나의 리스트로 반환
@@ -199,9 +191,14 @@ def process_puuid_data(**kwargs):
 
     raw_puuid_data = (challenger_data if challenger_data else []) + (grandmaster_data if grandmaster_data else []) \
         + (master_data if master_data else [])
+    
+    for t_ids in ['challenger_task', 'grandmaster_task', 'master_task']:
+        task_instance = TaskInstance(
+            dag.get_task(t_ids), execution_date=days_ago(1)
+        )
+        task_instance.clear_xcom_data()
 
     exe_datetime = kwargs['execution_date']  # execution_date 기준으로 폴더 명을 나눔
-    exe_string = exe_datetime.strftime('%Y-%m-%d')
 
     result_dict = dict()
 
@@ -354,6 +351,13 @@ def matching_info_to_s3(**kwargs):
     """
     S3에 matching_info를 적재
     """
+    
+
+    # 특정 TaskInstance와 연관된 XCom 데이터를 삭제
+    task_instance = TaskInstance(
+        dag.get_task('your_task_id'), execution_date=days_ago(1)
+    )
+    task_instance.clear_xcom_data()
     exe_datetime = kwargs['execution_date']  # execution_date 기준으로 폴더 명을 나눔
     exe_string = exe_datetime.strftime('%Y-%m-%d')
     match_data = kwargs['ti'].xcom_pull(task_ids='get_matching_ids_task')  # 매치데이터를 받아옴
@@ -445,14 +449,6 @@ with DAG(
         dag=dag
     )
 
-    # 티어 랭킹 top100+데이터 수집
-#    tier_task = PythonOperator(
-#        task_id='get_tier_task',
-#        python_callable=get_tier,
-#        provide_context=True,
-#        dag=dag
-#    )
-
     # 상위 유저정보들을 하나의 리스트로 정리
     process_puuid = PythonOperator(
         task_id = 'process_puuid_raw_data',
@@ -461,7 +457,7 @@ with DAG(
         dag=dag
     )
 
-    # matchId를 받아오는 태스트
+    # matchId를 받아오는 태스크
     matching_id_task = PythonOperator(
         task_id='get_matching_ids_task',
         python_callable=process_matching_ids,
