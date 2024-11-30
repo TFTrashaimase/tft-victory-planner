@@ -416,7 +416,7 @@ with DAG(
     'TFT_Riot_API_Dag',
     default_args=default_args,
     description='Get data from Riot API for TFT rankings',
-    schedule_interval='0 0 * * *',  # 매일 자정에 실행
+    # schedule_interval='0 0 * * *',  사용되지 않음.
     catchup=False,  # 과거 실행 날짜에 대해 실행하지 않음
     tags=['riot', 'tft']
 ) as dag:
