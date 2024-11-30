@@ -30,7 +30,7 @@ s3 = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY_ID, aws_secret_access_k
 tiers = ["DIAMOND", "EMERALD", "PLATINUM", "GOLD", "SILVER", "BRONZE"]
 divisions = ["I", "II", "III", "IV"]
 page = 1
-MATCHES_COUNT = 1  # 한 번에 가져올 매치 수, 원한다면 수정해서 작업. 테스트는 1, 디폴트는 20
+MATCHES_COUNT = 20  # 한 번에 가져올 매치 수, 원한다면 수정해서 작업. 테스트는 1, 디폴트는 20
 
 # Variables가 없다면 에러 발생
 if not API_KEY:
@@ -93,6 +93,7 @@ def get_challenger(**kwargs):
                 s_id = challenger_info["summonerId"]
 
                 challenger_data.append(get_entries_by_summoner(s_id))
+                
             if len(challenger_data) > 0:
                 return challenger_data
             else:
@@ -143,7 +144,7 @@ def get_master(**kwargs):
         response.raise_for_status()
         summoner_ids = response.json()["entries"]
         master_data = []
-        if 10 >= len(summoner_ids) > 0:
+        if len(summoner_ids) > 0:
             for master_info in summoner_ids[:10]:
                 time.sleep(2)
                 s_id = master_info["summonerId"]
@@ -161,31 +162,31 @@ def get_master(**kwargs):
         logging.error(f"Error fetching Master data: {e}")
         return None
 
-def get_tier(**kwargs):  
-    """
-    챌린저, 그랜드 마스터, 마스터까지 상위 랭크 유저가 100명이 되지 않는다면 100명 이상의 정보를 모으기 위해 그 아래 티어를 호출
-    """
-    data = []
-    for tier in tiers:
-        for division in divisions:
-            time.sleep(2)
-            # https://kr.api.riotgames.com/tft/league/v1/entries/DIAMOND/II?queue=RANKED_TFT&page=1
-            # BASE_URL=https://kr.api.riotgames.com
-            url = f"{BASE_URL}/tft/league/v1/entries/{tier}/{division}?queue={QUEUE_TYPE}&page={page}"
-            try:
-                response = requests.get(url, headers={"X-Riot-Token": API_KEY})
-                response.raise_for_status()
-                data = response.json()
+# def get_tier(**kwargs):  
+#     """
+#    챌린저, 그랜드 마스터, 마스터까지 상위 랭크 유저가 100명이 되지 않는다면 100명 이상의 정보를 모으기 위해 그 아래 티어를 호출
+#    """
+#    data = []
+#    for tier in tiers:
+#        for division in divisions:
+#            time.sleep(2)
+#            # https://kr.api.riotgames.com/tft/league/v1/entries/DIAMOND/II?queue=RANKED_TFT&page=1
+#            # BASE_URL=https://kr.api.riotgames.com
+#            url = f"{BASE_URL}/tft/league/v1/entries/{tier}/{division}?queue={QUEUE_TYPE}&page={page}"
+#            try:
+#                response = requests.get(url, headers={"X-Riot-Token": API_KEY})
+#                response.raise_for_status()
+#                data = response.json()
 
 
-                if len(data) >= 10:
-                    logging.info(f"Fetched {len(data)} records for Tier={tier}, Divisiozn={division}")
-                    return data[:10]
+#                if len(data) >= 10:
+#                    logging.info(f"Fetched {len(data)} records for Tier={tier}, Divisiozn={division}")
+#                    return data[:10]
 
-            except requests.exceptions.RequestException as e:
-                logging.error(f"Error fetching data for Tier={tier}, Division={division}: {e}")
-                continue
-    return data[:10]
+#            except requests.exceptions.RequestException as e:
+#                logging.error(f"Error fetching data for Tier={tier}, Division={division}: {e}")
+#                continue
+#    return data[:10]
 
 def process_puuid_data(**kwargs):
     """
@@ -447,12 +448,12 @@ with DAG(
     )
 
     # 티어 랭킹 top100+데이터 수집
-    tier_task = PythonOperator(
-        task_id='get_tier_task',
-        python_callable=get_tier,
-        provide_context=True,
-        dag=dag
-    )
+#    tier_task = PythonOperator(
+#        task_id='get_tier_task',
+#        python_callable=get_tier,
+#        provide_context=True,
+#        dag=dag
+#    )
 
     # 상위 유저정보들을 하나의 리스트로 정리
     process_puuid = PythonOperator(
@@ -493,4 +494,4 @@ with DAG(
 
 
 # 태스크 의존성 설정
-[challenger_task, grandmaster_task, master_task, tier_task] >> process_puuid >> matching_id_task >> matching_info_to_s3_task >> trigger_group
+[challenger_task, grandmaster_task, master_task] >> process_puuid >> matching_id_task >> matching_info_to_s3_task >> trigger_group
