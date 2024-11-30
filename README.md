@@ -5,6 +5,7 @@
 - 브랜치는 간략하게 main, feature 2개만 사용해요!
 - feature에서 작업 한 후, main과 병합할 때는 아래의 PR 템플릿을 따라주세요
   - feature 브랜치 이름 작성 방법: feature/기능요약
+- dev 브랜치 - 추가적인 작업 후 병합, 이후 테스트 거쳐 main 브랜치 반영
 
 [🔗 Pull Request 작성 가이드](https://github.com/TFTrashaimase/tft-victory-planner/blob/main/.github/pull_request_template.md)
 
