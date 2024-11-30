@@ -196,10 +196,9 @@ def process_puuid_data(**kwargs):
     challenger_data = ti.xcom_pull(task_ids='get_challenger_task')
     grandmaster_data = ti.xcom_pull(task_ids='get_grandmaster_task')
     master_data = ti.xcom_pull(task_ids='get_master_task')
-    tier_data = ti.xcom_pull(task_ids='get_tier_task')
 
     raw_puuid_data = (challenger_data if challenger_data else []) + (grandmaster_data if grandmaster_data else []) \
-        + (master_data if master_data else []) + (tier_data if tier_data else [])
+        + (master_data if master_data else [])
 
     exe_datetime = kwargs['execution_date']  # execution_date 기준으로 폴더 명을 나눔
     exe_string = exe_datetime.strftime('%Y-%m-%d')
@@ -365,7 +364,6 @@ def matching_info_to_s3(**kwargs):
 
     # API 호출 제한 => 1초에 20번, 2분에 100번
     for user in match_data.keys():
-        time.sleep(0.5)
         matches = match_data[user]
 
         for match in matches:
@@ -417,7 +415,7 @@ with DAG(
     'TFT_Riot_API_Dag',
     default_args=default_args,
     description='Get data from Riot API for TFT rankings',
-    # schedule_interval='0 0 * * *',  사용되지 않음.
+    schedule_interval=None,
     catchup=False,  # 과거 실행 날짜에 대해 실행하지 않음
     tags=['riot', 'tft']
 ) as dag:
