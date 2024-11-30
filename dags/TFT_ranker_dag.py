@@ -231,7 +231,7 @@ def get_matching_ids(puuid, **kwargs):
 
             if len(data) > 0:
                 logging.info(f"Fetched {len(data)} matching IDs for puuid: {puuid}")
-                return list(data)
+                return list(data).duplicate()
             else:
                 logging.info(f"No matching IDs found for puuid: {puuid}")
                 return []
