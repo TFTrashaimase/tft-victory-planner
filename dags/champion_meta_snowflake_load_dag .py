@@ -1,6 +1,10 @@
+# 수정된 부분은 다음 주석을 달아둠
+# dbt_run_dag 개선
+
 from airflow import DAG
 from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
+from airflow.operators.python import PythonOperator
 from airflow.models import Variable
 from datetime import datetime, timedelta
 
@@ -12,6 +16,11 @@ SNOWFLAKE_CHAMPION_INFO_TABLE = Variable.get("SNOWFLAKE_CHAMPION_INFO_TABLE", de
 BUCKET_NAME = Variable.get("BUCKET_NAME", default_var=None)
 AWS_ACCESS_KEY = Variable.get("AWS_ACCESS_KEY", default_var=None)
 AWS_SECRET_KEY = Variable.get("AWS_SECRET_KEY", default_var=None)
+
+# dbt_run_dag 개선
+# 함수 추가
+def set_completed_flag(**kwargs):
+    Variable.set("CMSLD_COMPLETED", "true")
 
 # DAG 기본 설정
 default_args = {
@@ -39,7 +48,7 @@ with DAG(
         autocommit=True,
     )
 
-    # # 2. 스테이지에 적재가 잘 되었는지 확인
+    # 2. 스테이지에 적재가 잘 되었는지 확인
     is_stage_data_ready = SnowflakeOperator(
         task_id="is_stage_data_ready",
         snowflake_conn_id="snowflake_conn",
@@ -47,7 +56,7 @@ with DAG(
         autocommit=True,
     )
 
-    # # 3. SNOWFLAKE_CHAMPION_INFO_TABLE 생성
+    # 3. SNOWFLAKE_CHAMPION_INFO_TABLE 생성
     create_bronze_champion_info = SnowflakeOperator(
         task_id="create_bronze_champion_info",
         snowflake_conn_id="snowflake_conn",
@@ -61,7 +70,7 @@ with DAG(
         autocommit=True,
     )
 
-    # # 4. 스테이지에서 RAW_CHAMPION_META 테이블로 데이터 복사
+    # 4. 스테이지에서 RAW_CHAMPION_META 테이블로 데이터 복사
     copy_into_bronze_champion_info = SnowflakeOperator(
         task_id="copy_into_bronze_champion_info",
         snowflake_conn_id="snowflake_conn",
@@ -79,9 +88,16 @@ with DAG(
             """,
         autocommit=True,
     )
-    
 
-    # 4. DBT 트리거
+    # dbt_run_dag 개선
+    # 5. 현재 DAG가 완료됐다는 걸 airflow 환경변수에 올림 ("CMSLD_COMPLETED": "true")
+    set_completion_flag = PythonOperator(
+        task_id="set_completion_flag",
+        python_callable=set_completed_flag,
+        provide_context=True,
+    )
+
+    # 6. DBT 트리거
     trigger_dbt_from_champ_meta = TriggerDagRunOperator(
         task_id='trigger_from_champ_meta',
         trigger_dag_id='dbt_run_dag', 
@@ -94,5 +110,6 @@ with DAG(
         >> is_stage_data_ready
         >> create_bronze_champion_info
         >> copy_into_bronze_champion_info
+        >> set_completion_flag  # dbt_run_dag 개선
         >> trigger_dbt_from_champ_meta
     )

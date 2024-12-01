@@ -1,8 +1,13 @@
+# 수정된 부분은 다음 주석을 달아둠
+# dbt_run_dag 개선
+
 # Define the default arguments for the DAG
-from airflow import DAG
-from airflow.operators.bash import BashOperator
 from datetime import datetime, timedelta
+
+from airflow import DAG
+from airflow.models import Variable  # dbt_run_dag 개선
 from airflow.operators.python import PythonOperator
+from airflow.operators.bash import BashOperator
 
 trigger_status = {"trigger_a": False, "trigger_b": False}
 
@@ -25,6 +30,9 @@ def check_triggers(**kwargs):
     prev_status = task.xcom_pull(task_ids='save_trigger_state', key='status')
     if prev_status:
         trigger_status.update(prev_status)
+
+    # dbt_run_dag 개선
+    trigger_status["trigger_b"] = Variable.get("CMSLD_COMPLETED", default_var="false") == "true"
     
     # 두 개의 트리거가 모두 True인지 확인
     if trigger_status["trigger_a"] and trigger_status["trigger_b"]:
