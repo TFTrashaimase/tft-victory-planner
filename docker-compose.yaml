@@ -47,6 +47,9 @@ x-airflow-common:
     AIRFLOW_VAR_SNOWFLAKE_CHAMPION_INFO_TABLE: ${SNOWFLAKE_CHAMPION_INFO_TABLE}
     AIRFLOW_VAR_SNOWFLAKE_STAGE_MATCH: ${SNOWFLAKE_STAGE_MATCH}
     AIRFLOW_VAR_SNOWFLAKE_STAGE_CHAMPION: ${SNOWFLAKE_STAGE_CHAMPION}
+    AIRFLOW_ADMIN_USERNAME: ${AIRFLOW_ADMIN_USERNAME}
+    AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD}
+    AIRFLOW_ADMIN_EMAIL: ${AIRFLOW_ADMIN_EMAIL}
     # yamllint disable rule:line-length
     # Use simple http server on scheduler for health checks
     # See https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/logging-monitoring/check-health.html#scheduler-health-check-server
