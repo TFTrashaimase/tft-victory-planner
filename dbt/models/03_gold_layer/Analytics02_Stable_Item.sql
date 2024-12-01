@@ -1,3 +1,5 @@
+{{ config(materialized='table') }}
+
 WITH latest_top_players AS (
     SELECT DISTINCT MATCH_ID, PUUID
     FROM {{ ref('match_player_details') }}

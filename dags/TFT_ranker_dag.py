@@ -1,38 +1,33 @@
-from airflow.decorators import task, dag
-from airflow.utils.dates import days_ago
-from airflow.models import Variable
-from airflow.operators.trigger_dagrun import TriggerDagRunOperator
-from airflow.utils.task_group import TaskGroup
-from datetime import datetime, timedelta
-import requests
-import logging
-import time
-import boto3
-import pyarrow as pa
-import pyarrow.parquet as pq
-import io
-from itertools import repeat
-
-import logging
-import requests
-import boto3
-import time
-import pyarrow as pa
-import pyarrow.parquet as pq
-import io
-
-from airflow.models import TaskInstance
-from airflow.utils.dates import days_ago
-from itertools import repeat
+# Airflow 관련 import
 from airflow import DAG
-from airflow.operators.python import PythonOperator
-from datetime import datetime, timedelta
-from airflow.models import Variable
-from airflow.operators.trigger_dagrun import TriggerDagRunOperator  
-from airflow.utils.task_group import TaskGroup  
+from airflow.decorators import task, dag
+from airflow.models import Variable 
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
+from airflow.utils.dates import days_ago
 
-# Variables 읽어오기 - .env 참고
+# 기본적인 날짜 관련 import
+from datetime import datetime, timedelta
+
+# 외부 라이브러리 import
+import logging
+import requests
+import boto3
+import time
+import pyarrow as pa
+import pyarrow.parquet as pq
+import io
+import logging
+import time
+from itertools import repeat
+
+# 필요 Variables 읽어오기 - .env 참고
 API_KEY = Variable.get("API_KEY", default_var=None)
+DH_API_KEY = Variable.get("DH_API_KEY", default_var=None)
+BJ_API_KEY = Variable.get("BJ_API_KEY", default_var=None)
+CY_API_KEY = Variable.get("CY_API_KEY", default_var=None)
+DM_API_KEY = Variable.get("DM_API_KEY", default_var=None)
+HK_API_KEY = Variable.get("HK_API_KEY", default_var=None)
+HT_APIKEY = Variable.get("HT_API_KEY", default_var=None)
 BASE_URL = Variable.get("BASE_URL", default_var=None)
 QUEUE_TYPE = Variable.get("QUEUE_TYPE", default_var=None)
 BUCKET_NAME = Variable.get("BUCKET_NAME", default_var=None)
@@ -49,7 +44,7 @@ divisions = ["I", "II", "III", "IV"]
 page = 1
 MATCHES_COUNT = 20  # 한 번에 가져올 매치 수, 원한다면 수정해서 작업. 테스트는 1, 디폴트는 20
 
-# Variables가 없다면 에러 발생
+# Variables가 없다면 에러 
 if not API_KEY:
     raise ValueError("환경 변수 API_KEY의 확인이 필요합니다.")
 
@@ -72,7 +67,7 @@ if not AWS_SECRET_ACCESS_KEY:
     raise ValueError("환경 변수 AWS_SECRET_ACCESS_KEY의 확인이 필요합니다.")
 
 
-def get_entries_by_summoner(summoner_id, **kwargs):
+def get_entries_by_summoner(summoner_id):
     """
     Summoner ID기반으로 API를 호출하여
     puuid가 들어간 유저 데이터를 수집하는 함수 
@@ -94,124 +89,7 @@ def get_entries_by_summoner(summoner_id, **kwargs):
         logging.error(f"Error fetching data for Summoner ID {summoner_id}: {e}")
         raise
 
-@task
-def get_challenger(**kwargs):
-    """
-    챌린저 유저 SummonerId를 받아와서 다른 api를 통해 puuid를 포함한 유저 데이터를 반환
-    """
-    url = f"{BASE_URL}/tft/league/v1/challenger?queue={QUEUE_TYPE}"
-    try:
-        response = requests.get(url, headers={"X-Riot-Token": API_KEY})
-        response.raise_for_status()
-        summoner_ids = response.json()["entries"]
-        challenger_data = []
-        if len(summoner_ids) > 0:
-            for challenger_info in summoner_ids:
-                time.sleep(1.3)
-                s_id = challenger_info["summonerId"]
-
-                challenger_data.append(get_entries_by_summoner(s_id))
-                
-            if len(challenger_data) > 0:
-                return challenger_data
-            else:
-                logging.info("No challenger players found")
-                return None
-        else:
-            logging.info("No Challenger players found")
-            return None
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Error fetching Challenger data: {e}")
-        return None
-
-def get_grandmaster(**kwargs):
-    """
-    그랜드 마스터 유저 SummonerId를 받아와서 다른 api를 통해 puuid를 포함한 유저 데이터를 반환
-    """
-    url = f"{BASE_URL}/tft/league/v1/grandmaster?queue={QUEUE_TYPE}"
-    try:
-        response = requests.get(url, headers={"X-Riot-Token": API_KEY})
-        response.raise_for_status()
-        summoner_ids = response.json()["entries"]
-        gmaster_data = []
-        if len(summoner_ids) > 0:
-            for gmaster_info in summoner_ids:
-                time.sleep(2)
-                s_id = gmaster_info["summonerId"]
-
-                gmaster_data.append(get_entries_by_summoner(s_id))
-            if len(gmaster_data) > 0:
-                return gmaster_data
-            else:
-                logging.info("No Grandmaster players found")
-                return None
-        else:
-            logging.info("No Grandmaster players found")
-            return None
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Error fetching Grandmaster data: {e}")
-        return None
-
-def get_master(**kwargs):
-    """
-    마스터 유저 SummonerId를 받아와서 다른 api를 통해 puuid를 포함한 유저 데이터를 반환
-    """
-    url = f"{BASE_URL}/tft/league/v1/master?queue={QUEUE_TYPE}"
-    try:
-        response = requests.get(url, headers={"X-Riot-Token": API_KEY})
-        response.raise_for_status()
-        summoner_ids = response.json()["entries"]
-        master_data = []
-        if len(summoner_ids) > 0:
-            for master_info in summoner_ids[:10]:
-                time.sleep(2)
-                s_id = master_info["summonerId"]
-
-                master_data.append(get_entries_by_summoner(s_id))
-            if len(master_data) > 0 :
-                return master_data
-            else:
-                logging.info("No Master players found")
-                return None
-        else:
-            logging.info("No Master players found")
-            return None
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Error fetching Master data: {e}")
-        return None
-
-def process_puuid_data(**kwargs):
-    """
-    상위 랭커들의 puuid 포함한 정보를 합쳐서 하나의 리스트로 반환
-    """
-    ti = kwargs['ti']
-    challenger_data = ti.xcom_pull(task_ids='get_challenger_task')
-    grandmaster_data = ti.xcom_pull(task_ids='get_grandmaster_task')
-    master_data = ti.xcom_pull(task_ids='get_master_task')
-
-    raw_puuid_data = (challenger_data if challenger_data else []) + (grandmaster_data if grandmaster_data else []) \
-        + (master_data if master_data else [])
-    
-    for t_ids in ['challenger_task', 'grandmaster_task', 'master_task']:
-        task_instance = TaskInstance(
-            dag.get_task(t_ids), execution_date=days_ago(1)
-        )
-        task_instance.clear_xcom_data()
-
-    exe_datetime = kwargs['execution_date']  # execution_date 기준으로 폴더 명을 나눔
-
-    result_dict = dict()
-
-    for key in raw_puuid_data[0]:
-        for d in raw_puuid_data:
-            if key not in result_dict:
-                result_dict[key] = [d[key]]
-            else:
-                result_dict[key].append(d[key])
-
-    return raw_puuid_data
-
-def get_matching_ids(puuid, **kwargs):
+def get_matching_ids(puuid):
     """
     상위 랭커들의 puuid 기반으로 API를 호출하여 Matching ID 목록을 가져오는 함수
     """
@@ -228,7 +106,7 @@ def get_matching_ids(puuid, **kwargs):
 
             if len(data) > 0:
                 logging.info(f"Fetched {len(data)} matching IDs for puuid: {puuid}")
-                return list(data).duplicate()
+                return list(data)
             else:
                 logging.info(f"No matching IDs found for puuid: {puuid}")
                 return []
@@ -263,7 +141,6 @@ def get_matching_ids(puuid, **kwargs):
         except requests.exceptions.RequestException as e:
             logging.error(f"Error fetching matching IDs for puuid: {puuid}: {e}")
             return []
-        
 
 
 def pad_dict_to_max_length(data_dict, pad_value=None):
@@ -281,29 +158,7 @@ def pad_dict_to_max_length(data_dict, pad_value=None):
     
     return padded_dict
 
-def process_matching_ids(**kwargs):
-    """
-    matching id를 하나의 리스트로 정리
-    """
-    puuid_list = kwargs['ti'].xcom_pull(task_ids='process_puuid_raw_data')  # 'process_data_task' 사용
-    exe_datetime = kwargs['execution_date']  # execution_date 기준으로 폴더 명을 나눔
-    exe_string = exe_datetime.strftime('%Y-%m-%d')
-    full_matching_ids = dict(zip([user['puuid'] for user in puuid_list], [[]] * len(puuid_list)))
 
-    if puuid_list:
-        for user in puuid_list:
-            puuid = user['puuid']
-            # puuid에 대해 matching ID를 가져옴
-            time.sleep(2)
-            matching_ids = get_matching_ids(puuid)
-            full_matching_ids[exe_string + '_' + puuid + '_' + 'matching_id'] = matching_ids
-            logging.info(f"Matching IDs for puuid {puuid}: {matching_ids}")
-        
-        full_matching_ids = pad_dict_to_max_length(full_matching_ids)
-    else:
-        logging.error(f"{puuid}: No match data for this puuid found from process_data_task in TFT_ranker_dag.py")
-
-    return full_matching_ids
 
 def ensure_uniform_length(data, target_length):
     """
@@ -347,67 +202,6 @@ def process_nested_json(data):
     else:
         return data
 
-def matching_info_to_s3(**kwargs):
-    """
-    S3에 matching_info를 적재
-    """
-    
-
-    # 특정 TaskInstance와 연관된 XCom 데이터를 삭제
-    task_instance = TaskInstance(
-        dag.get_task('your_task_id'), execution_date=days_ago(1)
-    )
-    task_instance.clear_xcom_data()
-    exe_datetime = kwargs['execution_date']  # execution_date 기준으로 폴더 명을 나눔
-    exe_string = exe_datetime.strftime('%Y-%m-%d')
-    match_data = kwargs['ti'].xcom_pull(task_ids='get_matching_ids_task')  # 매치데이터를 받아옴
-
-    if not match_data:
-        logging.info("No match data to process")
-        return exe_string
-
-    # API 호출 제한 => 1초에 20번, 2분에 100번
-    for user in match_data.keys():
-        matches = match_data[user]
-
-        for match in matches:
-            time.sleep(2)
-            if match is None:
-                continue
-            match_api_url = f"https://asia.api.riotgames.com/tft/match/v1/matches/{match}"
-            response = requests.get(match_api_url, headers={"X-Riot-Token": API_KEY})
-            response.raise_for_status()
-            data = response.json()
-
-            file_name = f"match_infos/{exe_string}/{user.split('_')[1]}_{match}.parquet"
-            print("=================================================================")
-            logging.info(f"matching_info file uploading: {file_name}")
-            print("=================================================================")
-
-            print("=================================================================")
-            print(f"file content: \n{response}")
-
-            try:
-                # json을 PyArrow로 변환 후 S3에 업로드
-                data = normalize_json(process_nested_json(data))
-                table = pa.Table.from_pydict(data)
-                buffer = io.BytesIO()
-                pq.write_table(table, buffer)
-                buffer.seek(0)  # 버퍼 포인터를 처음으로 이동
-                buffer_writer = buffer.getvalue()
-                s3_response = s3.put_object(
-                    Bucket=BUCKET_NAME,
-                    Key=file_name,
-                    Body=bytes(buffer_writer),
-                    ContentType='application/octet-stream' # Parquet 파일은 이진 형식이므로 이 MIME 타입을 사용하여 파일을 전송한다.
-                )
-                print(s3_response)
-                logging.info(f"Successfully uploaded {file_name} to S3.")
-            except boto3.exceptions.Boto3Error as e:
-                logging.error(f"Failed to upload {file_name} to S3: {e}")
-    
-    return exe_string
-
 # DAG 기본 설정
 default_args = {
     'start_date': datetime(2024, 1, 1),
@@ -423,69 +217,202 @@ with DAG(
     catchup=False,  # 과거 실행 날짜에 대해 실행하지 않음
     tags=['riot', 'tft']
 ) as dag:
+    
+    @task()
+    def get_challenger():
+        """
+        챌린저 유저 SummonerId를 받아와서 다른 api를 통해 puuid를 포함한 유저 데이터를 반환
+        """
+        url = f"{BASE_URL}/tft/league/v1/challenger?queue={QUEUE_TYPE}"
+        try:
+            response = requests.get(url, headers={"X-Riot-Token": API_KEY})
+            response.raise_for_status()
+            summoner_ids = response.json()["entries"]
+            challenger_data = []
+            if len(summoner_ids) > 0:
+                for challenger_info in summoner_ids:
+                    time.sleep(1.3)
+                    s_id = challenger_info["summonerId"]
 
-    # PythonOperator 정의
+                    challenger_data.append(get_entries_by_summoner(s_id))
+                    
+                if len(challenger_data) > 0:
+                    return challenger_data
+                else:
+                    logging.info("No challenger players found")
+                    return None
+            else:
+                logging.info("No Challenger players found")
+                return None
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Error fetching Challenger data: {e}")
+            return None
+
+    @task()
+    def get_grandmaster():
+        """
+        그랜드 마스터 유저 SummonerId를 받아와서 다른 api를 통해 puuid를 포함한 유저 데이터를 반환
+        """
+        url = f"{BASE_URL}/tft/league/v1/grandmaster?queue={QUEUE_TYPE}"
+        try:
+            response = requests.get(url, headers={"X-Riot-Token": API_KEY})
+            response.raise_for_status()
+            summoner_ids = response.json()["entries"]
+            gmaster_data = []
+            if len(summoner_ids) > 0:
+                for gmaster_info in summoner_ids:
+                    time.sleep(2)
+                    s_id = gmaster_info["summonerId"]
+
+                    gmaster_data.append(get_entries_by_summoner(s_id))
+                if len(gmaster_data) > 0:
+                    return gmaster_data
+                else:
+                    logging.info("No Grandmaster players found")
+                    return None
+            else:
+                logging.info("No Grandmaster players found")
+                return None
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Error fetching Grandmaster data: {e}")
+            return None
+
+    @task()
+    def get_master():
+        """
+        마스터 유저 SummonerId를 받아와서 다른 api를 통해 puuid를 포함한 유저 데이터를 반환
+        """
+        url = f"{BASE_URL}/tft/league/v1/master?queue={QUEUE_TYPE}"
+        try:
+            response = requests.get(url, headers={"X-Riot-Token": API_KEY})
+            response.raise_for_status()
+            summoner_ids = response.json()["entries"]
+            master_data = []
+            if len(summoner_ids) > 0:
+                for master_info in summoner_ids[:10]:
+                    time.sleep(2)
+                    s_id = master_info["summonerId"]
+
+                    master_data.append(get_entries_by_summoner(s_id))
+                if len(master_data) > 0 :
+                    return master_data
+                else:
+                    logging.info("No Master players found")
+                    return None
+            else:
+                logging.info("No Master players found")
+                return None
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Error fetching Master data: {e}")
+            return None
+    
+    @task()
+    def process_puuid_data(challenger_data, grandmaster_data, master_data):
+        """
+        상위 랭커들의 puuid 포함한 정보를 합쳐서 하나의 리스트로 반환
+        """
+        challenger_data = challenger_data if challenger_data else []
+        grandmaster_data = grandmaster_data if grandmaster_data else []
+        master_data = master_data if master_data else []
+
+        raw_puuid_data = challenger_data + grandmaster_data + master_data
+
+        return raw_puuid_data[:20], raw_puuid_data[20:40], raw_puuid_data[40:60], raw_puuid_data[60:80], raw_puuid_data[80:100], raw_puuid_data[100:120], raw_puuid_data[120:140]
+    
+    @task()
+    def cut_puuid_data(puuid_list, start, end):
+        return list(puuid_list)[start:end]
+
+    @task(retries=0)
+    def process_matching_ids_load_to_s3(puuid_list, api_key, **kwargs):
+        """
+        matching id를 하나의 리스트로 정리
+        """
+
+        exe_datetime = kwargs['execution_date']
+        exe_string = exe_datetime.strftime('%Y-%m-%d')
+
+        if puuid_list:
+            for user in puuid_list:
+                puuid = user['puuid']
+                # puuid에 대해 matching ID를 가져옴
+                time.sleep(1.2)
+                matching_ids = get_matching_ids(puuid)
+                for match in matching_ids:
+                    time.sleep(1.2)
+                    match_api_url = f"https://asia.api.riotgames.com/tft/match/v1/matches/{match}"
+                    response = requests.get(match_api_url, headers={"X-Riot-Token": api_key})
+                    response.raise_for_status()
+                    data = response.json()
+                    
+                    file_name = f"match_infos/{exe_string}/{puuid}_matches.parquet"
+                    print("=================================================================")
+                    logging.info(f"matching_info file uploading: {file_name}")
+                    print("=================================================================")
+
+                    print("=================================================================")
+                    print(f"file content: \n{response}")
+
+                    try:
+                        # json을 PyArrow로 변환 후 S3에 업로드
+                        data = normalize_json(process_nested_json(data))
+                        table = pa.Table.from_pydict(data)
+                        buffer = io.BytesIO()
+                        pq.write_table(table, buffer)
+                        buffer.seek(0)  # 버퍼 포인터를 처음으로 이동
+                        buffer_writer = buffer.getvalue()
+                        s3_response = s3.put_object(
+                            Bucket=BUCKET_NAME,
+                            Key=file_name,
+                            Body=bytes(buffer_writer),
+                            ContentType='application/octet-stream' # Parquet 파일은 이진 형식이므로 이 MIME 타입을 사용하여 파일을 전송한다.
+                        )
+                        print(s3_response)
+                        logging.info(f"Successfully uploaded {file_name} to S3.")
+                    except boto3.exceptions.Boto3Error as e:
+                        logging.error(f"Failed to upload {file_name} to S3: {e}")
+
+    @task(trigger_rule='one_success')  # api_key 최신화가 꼬일 수 있어서 one_success
+    def trigger_snowflake_load_dags(dag_id, **kwargs):
+        # TriggerDagRunOperator 객체를 실행
+        trigger_operator = TriggerDagRunOperator(
+            task_id=f'{dag_id}_trigger',
+            trigger_dag_id=dag_id,
+            conf={"triggered_by": "TFT_Riot_API_Dag", "triggered_dag": dag_id},
+            dag=kwargs['dag']  # 현재 DAG를 명시적으로 전달
+        )
+        trigger_operator.execute(context=kwargs)  # 명시적으로 execute 호출
+
+        return f"{dag_id} triggered"
+
     # 챌린저 랭킹 데이터 수집
-    challenger_task = PythonOperator(
-        task_id='get_challenger_task',
-        python_callable=get_challenger,
-        provide_context=True,
-        dag=dag
-    )
+    challenger_data = get_challenger()
 
     # 그랜드마스터 랭킹 데이터 수집
-    grandmaster_task = PythonOperator(
-        task_id='get_grandmaster_task',
-        python_callable=get_grandmaster,
-        provide_context=True,
-        dag=dag
-    )
+    grandmaster_data = get_grandmaster()
 
     # 마스터 랭킹 데이터 수집
-    master_task = PythonOperator(
-        task_id='get_master_task',
-        python_callable=get_master,
-        provide_context=True,
-        dag=dag
-    )
+    master_data = get_master()
 
     # 상위 유저정보들을 하나의 리스트로 정리
-    process_puuid = PythonOperator(
-        task_id = 'process_puuid_raw_data',
-        python_callable=process_puuid_data,
-        provide_context=True,
-        dag=dag
-    )
+    puuid_list = process_puuid_data(challenger_data, grandmaster_data, master_data)
 
-    # matchId를 받아오는 태스크
-    matching_id_task = PythonOperator(
-        task_id='get_matching_ids_task',
-        python_callable=process_matching_ids,
-        provide_context=True,
-        dag=dag
-    )
-
-    # s3에 업로드하는 task
-    matching_info_to_s3_task = PythonOperator(
-        task_id='matching_info_to_s3_task',
-        python_callable=matching_info_to_s3,
-        provide_context=True,
-        dag=dag
-    )
+    p1 = cut_puuid_data(puuid_list, 0, 20)
+    p2 = cut_puuid_data(puuid_list, 20, 40)
+    p3 = cut_puuid_data(puuid_list, 40, 60)
+    p4 = cut_puuid_data(puuid_list, 60, 80)
+    p5 = cut_puuid_data(puuid_list, 80, 100)
+    p6 = cut_puuid_data(puuid_list, 100, 120)
+    p7 = cut_puuid_data(puuid_list, 120, 140)
 
     # 트리거할 DAG ID 리스트
     dag_ids_to_trigger = ['match_info_snowflake_load_dag']
 
-    with TaskGroup(group_id='trigger_snowflake_load_dags') as trigger_group:
-        for dag_id in dag_ids_to_trigger:
-            conf = {
-                    "s3_bucket_folder": "{{ task_instance.xcom_pull(task_ids='load_json_to_s3') }}",
-                    "triggered_by": "TFT_Riot_API_Dag", 
-                    "triggered_dag": dag_id,
-                    "execution_date": "{{ execution_date.isoformat() }}",
-                }
-            TriggerDagRunOperator(task_id=f'trigger_{dag_id}', trigger_dag_id=dag_id, conf=conf)
-
-
-# 태스크 의존성 설정
-[challenger_task, grandmaster_task, master_task] >> process_puuid >> matching_id_task >> matching_info_to_s3_task >> trigger_group
+    # 트리거    
+    [process_matching_ids_load_to_s3(p1, API_KEY), \
+    process_matching_ids_load_to_s3(p2, DH_API_KEY), \
+    process_matching_ids_load_to_s3(p3, BJ_API_KEY), \
+    process_matching_ids_load_to_s3(p4, CY_API_KEY), \
+    process_matching_ids_load_to_s3(p5, DM_API_KEY), \
+    process_matching_ids_load_to_s3(p6, HK_API_KEY), \
+    process_matching_ids_load_to_s3(p7, HT_APIKEY)] >> trigger_snowflake_load_dags('match_info_snowflake_load_dag')
