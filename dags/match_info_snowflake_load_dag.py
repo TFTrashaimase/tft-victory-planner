@@ -1,6 +1,7 @@
 from airflow import DAG
 from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
+from airflow.operators.python import PythonOperator
 from airflow.models import Variable
 from datetime import datetime, timedelta
 
@@ -21,6 +22,11 @@ default_args = {
     "start_date": datetime(2024, 1, 1),
 }
 
+def set_completed_flag_at_match_info(**kwargs):
+    exe_datetime = kwargs['execution_date']
+    exe_string = exe_datetime.strftime('%Y-%m-%d')
+    
+    Variable.set("trigger_from_match_info", exe_string)
 
 with DAG(
     dag_id="match_info_snowflake_load_dag",
@@ -85,7 +91,14 @@ with DAG(
         autocommit=True,
     )
 
-    # 4. DBT 트리거
+    # dbt_run_dag 개선
+    set_completion_flag = PythonOperator(
+        task_id="set_completion_flag_from_match_info",
+        python_callable=set_completed_flag_at_match_info,
+        provide_context=True,
+    )
+
+    # 5. DBT 트리거
     trigger_dbt_from_match_info = TriggerDagRunOperator(
         task_id='trigger_from_match_infos',
         trigger_dag_id='dbt_run_dag',  
@@ -98,5 +111,6 @@ with DAG(
         >> is_stage_data_ready
         >> create_bronze_match_info
         >> copy_into_bronze_match_info
+        >> set_completion_flag
         >> trigger_dbt_from_match_info
     )
