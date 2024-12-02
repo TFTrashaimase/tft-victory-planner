@@ -12,8 +12,8 @@ WITH bronze_data AS (
 ),
 flattened_participants AS (
     SELECT
-        id_item.NEXTVAL AS id,
-        json_data:metadata:match_id::STRING AS match_id,
+        ROW_NUMBER() OVER (ORDER BY p.value:puuid) AS id,
+        data:metadata:match_id::STRING AS match_id,
         p.value:puuid::STRING AS puuid,
         u.value:character_id::STRING AS character_id,
         ARRAY_TO_STRING(u.value:itemNames, ', ') AS item_name, -- 배열을 문자열로 변환
@@ -23,7 +23,7 @@ flattened_participants AS (
         CURRENT_TIMESTAMP() AS created_at
     FROM
         bronze_data,
-        LATERAL FLATTEN(INPUT => json_data:info:participants) p,
+        LATERAL FLATTEN(INPUT => data:info:participants) p,
         LATERAL FLATTEN(INPUT => p.value:units) u
 )
 SELECT *

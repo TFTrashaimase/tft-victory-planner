@@ -16,11 +16,17 @@ pyopenssl==24.2.1
 # apache-airflow-providers-mysql
 apache-airflow-providers-mysql==5.7.0
 
+# apache-airflow[snowflake]
+apache-airflow[snowflake]==2.9.1
+
+# apache-airflow-providers-amazon 
+apache-airflow-providers-amazon==9.1.0
+
+# apache-airflow-providers-snowflake
+apache-airflow-providers-snowflake==5.8.1
+
 # sqlalchemy
 sqlalchemy==1.4.49
-
-# dbt-core
-dbt-core==1.8.9
 
 # dbt-snowflake
 dbt-snowflake==1.7.1
@@ -32,7 +38,10 @@ boto3==1.35.68
 pyarrow==18.1.0
 
 # pandas
-pandas==2.2.3
+pandas>=2.1.2,<2.2
 
 # botocore
 botocore==1.35.69
+
+# dbt-core
+dbt-core==1.7.18
