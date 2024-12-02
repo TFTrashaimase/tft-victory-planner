@@ -9,3 +9,5 @@
 [🔗 Pull Request 작성 가이드](https://github.com/TFTrashaimase/tft-victory-planner/blob/main/.github/pull_request_template.md)
 
 [🔗 커밋 메시지 작성 가이드](https://www.notion.so/dfc6c32caa2f4528961dd0b149902be5)
+
+- test
