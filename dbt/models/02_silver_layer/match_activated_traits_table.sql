@@ -1,7 +1,6 @@
 {{ config(
     materialized='incremental',
     unique_key='id',
-    schema='SILVER_DATA'
 ) }}
 
 WITH bronze_data AS (
@@ -12,8 +11,8 @@ WITH bronze_data AS (
 )
 
 SELECT
-    id_seq.NEXTVAL AS id,
-    json_data:metadata:match_id::STRING AS match_id,
+    ROW_NUMBER() OVER (ORDER BY p.value:puuid) AS id,
+    data:metadata:match_id::STRING AS match_id,
     p.value:puuid::STRING AS puuid,
     t.value:name::STRING AS trait_name,
     t.value:num_units::INTEGER AS trait_num_units,
@@ -23,5 +22,5 @@ SELECT
     CURRENT_TIMESTAMP() AS created_at
 FROM
     bronze_data,
-    LATERAL FLATTEN(INPUT => json_data:info:participants) p,
+    LATERAL FLATTEN(INPUT => data:info:participants) p,
     LATERAL FLATTEN(INPUT => p.value:traits) t
