@@ -19,8 +19,11 @@ AWS_SECRET_KEY = Variable.get("AWS_SECRET_KEY", default_var=None)
 
 # dbt_run_dag 개선
 # 함수 추가
-def set_completed_flag(**kwargs):
-    Variable.set("CMSLD_COMPLETED", "true")
+def set_completed_flag_at_champ_meta(**kwargs):
+    exe_datetime = kwargs['execution_date']
+    exe_string = exe_datetime.strftime('%Y-%m-%d')
+
+    Variable.set("trigger_from_champion_meta", exe_string)
 
 # DAG 기본 설정
 default_args = {
@@ -92,8 +95,8 @@ with DAG(
     # dbt_run_dag 개선
     # 5. 현재 DAG가 완료됐다는 걸 airflow 환경변수에 올림 ("CMSLD_COMPLETED": "true")
     set_completion_flag = PythonOperator(
-        task_id="set_completion_flag",
-        python_callable=set_completed_flag,
+        task_id="set_completion_flag_from_champ_meta",
+        python_callable=set_completed_flag_at_champ_meta,
         provide_context=True,
     )
 

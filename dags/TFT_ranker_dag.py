@@ -334,6 +334,8 @@ with DAG(
 
         if puuid_list:
             for user in puuid_list:
+                if not isinstance(user, dict) or 'puuid' not in user:
+                    continue
                 puuid = user['puuid']
                 # puuid에 대해 matching ID를 가져옴
                 time.sleep(1.2)
