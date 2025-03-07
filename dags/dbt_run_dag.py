@@ -1,7 +1,6 @@
-# Define the default arguments for the DAG
-from datetime import datetime, timedelta
 from airflow import DAG
-from airflow.models import Variable
+from airflow.models import DagRun
+from airflow.utils.db import provide_session
 from airflow.operators.python import PythonOperator
 from airflow.operators.bash import BashOperator
 
@@ -12,41 +11,38 @@ default_args = {
     'retry_delay': timedelta(minutes=1)
 }
 
-def check_triggers(**kwargs):
-    """
-    트리거 상태 확인. 두 개의 트리거가 모두 True일 경우 True를 반환.
-    """
-    exe_datetime = kwargs['execution_date']
-    exe_string = exe_datetime.strftime('%Y-%m-%d')
+# 최근 실행 여부 체크 함수
+@provide_session
+def check_last_run(**kwargs, session=None):
+    """ 최근 실행된 DAG이 1시간 내에 실행되었는지 확인 후, 트리거 여부 결정 """
+    target_dag_id = "dbt_run_dag" 
 
-    trigger_from_match_info = Variable.get("trigger_from_match_info", "true")
-    trigger_from_champ_meta = Variable.get("trigger_from_champion_meta", "true")
+    last_run = session.query(DagRun).filter(
+        DagRun.dag_id == target_dag_id,
+        DagRun.state == "success"  # 성공한 DAG만 체크
+    ).order_by(DagRun.execution_date.desc()).first()
 
-    # dbt_run_dag 개선
-    # 두 트리거가 모두 True인지 확인
-    if trigger_from_champ_meta == exe_string and trigger_from_match_info == exe_string:
-        print("All triggers received. Proceeding to dbt run.")
-        return True
-    else:
-        print(f"Current trigger state:")
-        print("match_info: ", f"{trigger_from_match_info}")
-        print("champ_meta: ", f"{trigger_from_champ_meta}")
-        raise Exception("Not both dags are completed")
+    if last_run:
+        last_run_time = last_run.execution_date
+        if (datetime.utcnow() - last_run_time).total_seconds() < 3600:
+            print("Skipping DAG run: Last run was within the past hour.")
+            return False  # 1시간 내 실행됨 → 실행하지 않음
 
-# Create the DAG with the specified schedule interval
+    print("Running DAG: No recent run within the past hour.")
+    return True  # 실행 가능
+
 with DAG('dbt_run_dag', default_args=default_args, schedule="@once", catchup=False) as dag:
 
-    check_all_triggers = PythonOperator(
-            task_id='check_all_triggers',
-            python_callable=check_triggers,
+    check_to_run = PythonOperator(
+            task_id='check_to_run',
+            python_callable=check_last_run,
             provide_context=True,
         )
 
-    # Define the dbt run command as a BashOperator
     run_dbt_model = BashOperator(
         task_id='run_dbt_model',
         bash_command='cd /opt/airflow/dbt && dbt build --profiles-dir /opt/airflow/dbt --project-dir /opt/airflow/dbt',
         dag=dag
     )
 
-    check_all_triggers >> run_dbt_model
+    check_to_run >> run_dbt_model
